@@ -1,0 +1,1254 @@
+{
+  "alarmId": "ALARM-0312",
+  "status": "ok",
+  "årsak": null,
+  "rapport": {
+    "tittel": "ALARM-0312: Høy 5xx-rate på POST /betaling/trekk etter utrulling av betaling 2.14.0 (utenlandske kort)",
+    "alvorlighet": "kritisk",
+    "status": "pågår",
+    "berorte_tjenester": [
+      "betaling"
+    ],
+    "fakta": [
+      {
+        "tekst": "ALARM-0312 (kritisk) gikk 03:12: 5xx-andel 9.4 % siste 5 min, terskel 5 %, for POST /betaling/trekk.",
+        "kilder": [
+          "ALARM-0312",
+          "LOG-0103"
+        ]
+      },
+      {
+        "tekst": "Versjon 2.14.0 ble rullet ut 02:51:12 og kjørte på betaling-01/02/03 kl. 02:51:48. Endringen: gebyrberegning for utenlandske kort henter valuta fra kortinfo-objektet i stedet for fra transaksjonen. Helsesjekk var OK 02:51:50.",
+        "kilder": [
+          "DEPLOY-009",
+          "LOG-0042",
+          "LOG-0044",
+          "LOG-0045"
+        ]
+      },
+      {
+        "tekst": "Første TypeError ('valuta' av undefined i beregnGebyr, gebyr.js:88, kort=utenlandsk) kom 02:52:30, ca. 80 sekunder etter utrullingen. Samme feil gjentar seg omtrent hvert 2.–3. minutt frem til siste logg 03:47:42. Alle feillinjene i utvalget gjelder utenlandske kort.",
+        "kilder": [
+          "LOG-0048",
+          "LOG-0053",
+          "LOG-0101",
+          "LOG-0254"
+        ]
+      },
+      {
+        "tekst": "Feilraten steg: 6.1 % kl. 03:05, 8.7 % kl. 03:10, 9.4 % kl. 03:12. Vellykkede betalinger og refusjoner er også logget i perioden, så feilen er delvis og ikke total.",
+        "kilder": [
+          "LOG-0083",
+          "LOG-0097",
+          "LOG-0103",
+          "LOG-0104",
+          "LOG-0238",
+          "LOG-0248"
+        ]
+      },
+      {
+        "tekst": "Kortnett svarte normalt (191–340 ms) i de fleste målingene. Én treg måling på 1840 ms kl. 03:26:40 (over 1500 ms-grensen).",
+        "kilder": [
+          "LOG-0066",
+          "LOG-0087",
+          "LOG-0113",
+          "LOG-0234",
+          "LOG-0151"
+        ]
+      },
+      {
+        "tekst": "Runbook (oppdatert 2026-08-20) sier at TypeError rett etter utrulling peker på ny kode, og anbefaler rollback til forrige versjon (`deploy rollback betaling`). Forrige versjon er 2.13.2 fra 2026-10-21. Runbooken er eldre enn 2.14.0, men trinnene stemmer med observasjonene.",
+        "kilder": [
+          "RUNBOOK-betaling",
+          "DEPLOY-002"
+        ]
+      }
+    ],
+    "hypoteser": [
+      {
+        "tekst": "Sannsynlig årsak: 2.14.0 har en feil i ny gebyrberegning. Kortinfo-objektet er undefined for (minst noen) utenlandske kort, og beregnGebyr kaster TypeError som gir 5xx.",
+        "sikkerhet": "høy",
+        "kilder": [
+          "DEPLOY-009",
+          "LOG-0048",
+          "LOG-0254",
+          "RUNBOOK-betaling"
+        ],
+        "motbevis": [
+          "Tidssamsvar beviser ikke årsak alene, men feilmeldingen peker direkte på endret kode.",
+          "Ikke verifisert hvor stor andel av utenlandske kort som feiler, eller om alle 5xx er denne feilen."
+        ]
+      },
+      {
+        "tekst": "Treghet hos Kortnett bidrar til 5xx.",
+        "sikkerhet": "lav",
+        "kilder": [
+          "LOG-0151"
+        ],
+        "motbevis": [
+          "Bare én treg måling (kl. 03:26), etter at feilen startet.",
+          "Runbook sier treghet gir timeout, ikke 5xx.",
+          "Øvrige målinger er normale."
+        ]
+      }
+    ],
+    "usikkerhet": [
+      "Loggutvalget er ikke full telling. Faktisk 5xx-rate nå og andel feilede utenlandske kort er ukjent.",
+      "Alarmtekst gir 9.4 % kl. 03:12. Rate etter dette er ikke målt i dataene. Feillinjene fortsetter til 03:47:42, så feilen ser ut til å vedvare, men det er ikke bekreftet som rate.",
+      "Ukjent om kunde-db bidrar. Den er ikke undersøkt, og ingenting i betalingsloggene peker dit.",
+      "Ukjent om rollback er forsøkt eller om noen er varslet. Ingenting er utført av meg.",
+      "Tjenestekatalogen er udatert."
+    ],
+    "neste_steg": [
+      {
+        "tiltak": "Vurder rollback av betaling til 2.13.2 etter runbook (`deploy rollback betaling`). Menneskelig vakt må beslutte og utføre, og si fra i #betaling-drift. Alternativt kan en hurtigrettelse som sikrer valuta-oppslaget rulles ut.",
+        "ansvarlig": "Primærvakt Sigrid Gravlund, sekundær Ola Benkvist (Team Myntkammer)",
+        "verifisering": "Kontroller at TypeError i beregnGebyr (gebyr.js:88) ikke lenger logges for utenlandske kort, at 5xx-andelen på POST /betaling/trekk ligger under alarmterskelen på 5 % over et tilstrekkelig måleintervall, og at utenlandske kort fullføres.",
+        "kilder": [
+          "RUNBOOK-betaling",
+          "DEPLOY-009",
+          "LOG-0254"
+        ]
+      },
+      {
+        "tiltak": "Utvikler i Team Myntkammer undersøker hvorfor kortinfo er undefined i gebyr.js:88. Vurder også om feilede betalinger (for eksempel id=b-815535) må følges opp mot kunder.",
+        "ansvarlig": "Team Myntkammer",
+        "verifisering": "Kontroller at rettelsen er dekket av test for utenlandske kort før ny utrulling, og at de feilede transaksjons-ID-ene er gjennomgått.",
+        "kilder": [
+          "LOG-0048",
+          "LOG-0254",
+          "DEPLOY-009"
+        ]
+      }
+    ],
+    "eskalering": "Vekk primærvakt i Team Myntkammer (Sigrid Gravlund), sekundær Ola Benkvist. Alarmen er kritisk, og feilen ser ut til å vedvare til siste logg 03:47:42 (observasjonstid 03:48:05). Ingen er varslet av meg."
+  },
+  "ved": "2026-10-29T03:48:05+01:00",
+  "modus": "modell",
+  "modell": "claude-sonnet-5-5",
+  "iterasjoner": 4,
+  "verktoykall": 6,
+  "bruk": {
+    "input_tokens": 45707,
+    "output_tokens": 5472,
+    "cache_read_input_tokens": 0,
+    "cache_creation_input_tokens": 0
+  },
+  "kilder": [
+    {
+      "id": "ALARM-0312",
+      "tid": "2026-10-29T03:12:00+01:00",
+      "tjeneste": "betaling",
+      "alvorlighet": "kritisk",
+      "tittel": "Feilrate 5xx over terskel",
+      "tekst": "betaling: andel 5xx-svar siste 5 min er 9.4 % (terskel 5 %). Gjelder POST /betaling/trekk.",
+      "kilde_id": "ALARM-0312",
+      "fil": "data/alarmer.json"
+    },
+    {
+      "navn": "betaling",
+      "beskrivelse": "Kortbetaling og refusjon. Snakker med ekstern kortleverandør Kortnett.",
+      "eier_team": "Team Myntkammer",
+      "vakt": {
+        "primær": "Sigrid Gravlund",
+        "sekundær": "Ola Benkvist"
+      },
+      "avhengigheter": [
+        "kunde-db",
+        "Kortnett (ekstern)"
+      ],
+      "kilde_id": "TJENESTE-betaling",
+      "fil": "data/tjenester.json"
+    },
+    {
+      "tid": "2026-10-29T02:51:12+01:00",
+      "tjeneste": "betaling",
+      "versjon": "2.14.0",
+      "av": "Release-tog natt-1029",
+      "endring": "Ny gebyrberegning for utenlandske kort. Valuta hentes nå fra kortinfo-objektet i stedet for fra transaksjonen.",
+      "kilde_id": "DEPLOY-009",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-21T13:40:00+02:00",
+      "tjeneste": "betaling",
+      "versjon": "2.13.2",
+      "av": "Release-tog",
+      "endring": "Oppdatert avhengigheter, ingen funksjonelle endringer.",
+      "kilde_id": "DEPLOY-002",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-29T03:05:00+01:00",
+      "tjeneste": "betaling",
+      "nivå": "WARN",
+      "melding": "feilrate 5xx siste 5 min: 6.1%",
+      "kilde_id": "LOG-0083",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:10:00+01:00",
+      "tjeneste": "betaling",
+      "nivå": "WARN",
+      "melding": "feilrate 5xx siste 5 min: 8.7%",
+      "kilde_id": "LOG-0097",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:26:40+01:00",
+      "tjeneste": "betaling",
+      "nivå": "WARN",
+      "melding": "kortnett svarte på 1840ms (over 1500ms-grensen)",
+      "kilde_id": "LOG-0151",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:51:12+01:00",
+      "tjeneste": "betaling",
+      "nivå": "INFO",
+      "melding": "utrulling startet: versjon 2.14.0 (release-tog natt-1029)",
+      "kilde_id": "LOG-0042",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:51:48+01:00",
+      "tjeneste": "betaling",
+      "nivå": "INFO",
+      "melding": "versjon 2.14.0 kjører på betaling-01, betaling-02, betaling-03",
+      "kilde_id": "LOG-0044",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:51:50+01:00",
+      "tjeneste": "betaling",
+      "nivå": "INFO",
+      "melding": "helsesjekk /helse OK",
+      "kilde_id": "LOG-0045",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:52:03+01:00",
+      "tjeneste": "betaling",
+      "nivå": "INFO",
+      "melding": "refusjon registrert id=r-785216",
+      "kilde_id": "LOG-0047",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:52:30+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-617248 kort=utenlandsk",
+      "kilde_id": "LOG-0048",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:54:34+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-364766 kort=utenlandsk",
+      "kilde_id": "LOG-0053",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:56:58+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-408988 kort=utenlandsk",
+      "kilde_id": "LOG-0057",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:59:15+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-434760 kort=utenlandsk",
+      "kilde_id": "LOG-0064",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:59:44+01:00",
+      "tjeneste": "betaling",
+      "nivå": "INFO",
+      "melding": "kortnett svarte på 340ms",
+      "kilde_id": "LOG-0066",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:01:53+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-803381 kort=utenlandsk",
+      "kilde_id": "LOG-0073",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:04:11+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-511869 kort=utenlandsk",
+      "kilde_id": "LOG-0078",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:06:02+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-966566 kort=utenlandsk",
+      "kilde_id": "LOG-0085",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:08:09+01:00",
+      "tjeneste": "betaling",
+      "nivå": "INFO",
+      "melding": "kortnett svarte på 238ms",
+      "kilde_id": "LOG-0087",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:08:31+01:00",
+      "tjeneste": "betaling",
+      "nivå": "INFO",
+      "melding": "kortnett svarte på 282ms",
+      "kilde_id": "LOG-0092",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:08:53+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-413141 kort=utenlandsk",
+      "kilde_id": "LOG-0094",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:11:25+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-161091 kort=utenlandsk",
+      "kilde_id": "LOG-0101",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:12:00+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "feilrate 5xx siste 5 min: 9.4% (terskel 5%)",
+      "kilde_id": "LOG-0103",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:12:20+01:00",
+      "tjeneste": "betaling",
+      "nivå": "INFO",
+      "melding": "betaling fullført id=b-169732 beløp=890 NOK",
+      "kilde_id": "LOG-0104",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:13:51+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-461454 kort=utenlandsk",
+      "kilde_id": "LOG-0109",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:14:29+01:00",
+      "tjeneste": "betaling",
+      "nivå": "INFO",
+      "melding": "kortnett svarte på 311ms",
+      "kilde_id": "LOG-0113",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:15:54+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-913933 kort=utenlandsk",
+      "kilde_id": "LOG-0114",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:18:00+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-425416 kort=utenlandsk",
+      "kilde_id": "LOG-0120",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:19:35+01:00",
+      "tjeneste": "betaling",
+      "nivå": "INFO",
+      "melding": "refusjon registrert id=r-537530",
+      "kilde_id": "LOG-0124",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:20:46+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-666983 kort=utenlandsk",
+      "kilde_id": "LOG-0125",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:23:31+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-836601 kort=utenlandsk",
+      "kilde_id": "LOG-0136",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:25:10+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-895821 kort=utenlandsk",
+      "kilde_id": "LOG-0144",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:27:09+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-374171 kort=utenlandsk",
+      "kilde_id": "LOG-0157",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:29:33+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-569943 kort=utenlandsk",
+      "kilde_id": "LOG-0168",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:31:40+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-816234 kort=utenlandsk",
+      "kilde_id": "LOG-0179",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:33:28+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-970820 kort=utenlandsk",
+      "kilde_id": "LOG-0189",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:36:18+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-895466 kort=utenlandsk",
+      "kilde_id": "LOG-0213",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:38:25+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-338453 kort=utenlandsk",
+      "kilde_id": "LOG-0222",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:40:42+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-413668 kort=utenlandsk",
+      "kilde_id": "LOG-0232",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:40:53+01:00",
+      "tjeneste": "betaling",
+      "nivå": "INFO",
+      "melding": "kortnett svarte på 191ms",
+      "kilde_id": "LOG-0234",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:41:46+01:00",
+      "tjeneste": "betaling",
+      "nivå": "INFO",
+      "melding": "betaling fullført id=b-458108 beløp=1968 NOK",
+      "kilde_id": "LOG-0238",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:43:22+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-267913 kort=utenlandsk",
+      "kilde_id": "LOG-0243",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:45:07+01:00",
+      "tjeneste": "betaling",
+      "nivå": "INFO",
+      "melding": "betaling fullført id=b-604359 beløp=2553 NOK",
+      "kilde_id": "LOG-0248",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:45:22+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-607171 kort=utenlandsk",
+      "kilde_id": "LOG-0249",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:47:42+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-815535 kort=utenlandsk",
+      "kilde_id": "LOG-0254",
+      "fil": "data/logger.json"
+    },
+    {
+      "kilde_id": "RUNBOOK-betaling",
+      "fil": "data/runbooks/betaling.md",
+      "tjeneste": "betaling",
+      "sist_oppdatert": "2026-08-20",
+      "innhold": "# Runbook: betaling\n\nSist oppdatert: 2026-08-20 (Team Myntkammer)\n\n## Høy feilrate (5xx)\n\n1. Sjekk om det er rullet ut en ny versjon den siste timen. Release-toget ruller ut automatisk om natta.\n2. Se etter `TypeError` eller `ReferenceError` i loggene. Det peker nesten alltid på ny kode.\n3. Hvis feilene startet rett etter en utrulling: rull tilbake med `deploy rollback betaling` til forrige versjon. Det tar ca 2 minutter.\n4. Hvis det ikke er en ny versjon: sjekk svartiden fra Kortnett. Treghet der gir timeout, ikke 5xx.\n\n## Hvem vekkes\n\nVakt i Team Myntkammer. Rollback kan gjøres av hvem som helst med vakt, men si fra i #betaling-drift.\n"
+    }
+  ],
+  "spor": [
+    {
+      "type": "runde",
+      "nummer": 1,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 6096,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 321,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "hent_alarmer",
+      "input": {
+        "id": "ALARM-0312"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 1
+        },
+        "alarmer": [
+          {
+            "id": "ALARM-0312",
+            "tid": "2026-10-29T03:12:00+01:00",
+            "tjeneste": "betaling",
+            "alvorlighet": "kritisk",
+            "tittel": "Feilrate 5xx over terskel",
+            "tekst": "betaling: andel 5xx-svar siste 5 min er 9.4 % (terskel 5 %). Gjelder POST /betaling/trekk.",
+            "kilde_id": "ALARM-0312",
+            "fil": "data/alarmer.json"
+          }
+        ],
+        "kilder": [
+          "ALARM-0312"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "hent_tjenesteinfo",
+      "input": {
+        "tjeneste": "betaling"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 1,
+          "merknad": "Tjenestekatalogen er udatert. Historisk korrekthet ved eldre observasjonstid kan ikke bekreftes."
+        },
+        "tjenester": [
+          {
+            "navn": "betaling",
+            "beskrivelse": "Kortbetaling og refusjon. Snakker med ekstern kortleverandør Kortnett.",
+            "eier_team": "Team Myntkammer",
+            "vakt": {
+              "primær": "Sigrid Gravlund",
+              "sekundær": "Ola Benkvist"
+            },
+            "avhengigheter": [
+              "kunde-db",
+              "Kortnett (ekstern)"
+            ],
+            "kilde_id": "TJENESTE-betaling",
+            "fil": "data/tjenester.json"
+          }
+        ],
+        "kilder": [
+          "TJENESTE-betaling"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sjekk_deploy_historikk",
+      "input": {
+        "tjeneste": "betaling"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 2
+        },
+        "deployer": [
+          {
+            "tid": "2026-10-29T02:51:12+01:00",
+            "tjeneste": "betaling",
+            "versjon": "2.14.0",
+            "av": "Release-tog natt-1029",
+            "endring": "Ny gebyrberegning for utenlandske kort. Valuta hentes nå fra kortinfo-objektet i stedet for fra transaksjonen.",
+            "kilde_id": "DEPLOY-009",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-21T13:40:00+02:00",
+            "tjeneste": "betaling",
+            "versjon": "2.13.2",
+            "av": "Release-tog",
+            "endring": "Oppdatert avhengigheter, ingen funksjonelle endringer.",
+            "kilde_id": "DEPLOY-002",
+            "fil": "data/deploy-historikk.json"
+          }
+        ],
+        "kilder": [
+          "DEPLOY-009",
+          "DEPLOY-002"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sok_i_logger",
+      "input": {
+        "tjeneste": "betaling",
+        "fra": "02:50",
+        "til": "03:48",
+        "niva": "WARN",
+        "maks": 100
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "filtre": {
+            "tjeneste": "betaling",
+            "fra": "02:50",
+            "til": "03:48",
+            "niva": "WARN",
+            "maks": 100
+          },
+          "total": 3,
+          "returnert": 3,
+          "offset": 0,
+          "maks": 100,
+          "avkortet": false,
+          "neste_offset": null,
+          "første_treff": "2026-10-29T03:05:00+01:00",
+          "siste_treff": "2026-10-29T03:26:40+01:00",
+          "datavindu": {
+            "fra": "2026-10-29T02:30:04+01:00",
+            "til": "2026-10-29T03:48:05+01:00"
+          },
+          "merknad": null
+        },
+        "logger": [
+          {
+            "tid": "2026-10-29T03:05:00+01:00",
+            "tjeneste": "betaling",
+            "nivå": "WARN",
+            "melding": "feilrate 5xx siste 5 min: 6.1%",
+            "kilde_id": "LOG-0083",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:10:00+01:00",
+            "tjeneste": "betaling",
+            "nivå": "WARN",
+            "melding": "feilrate 5xx siste 5 min: 8.7%",
+            "kilde_id": "LOG-0097",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:26:40+01:00",
+            "tjeneste": "betaling",
+            "nivå": "WARN",
+            "melding": "kortnett svarte på 1840ms (over 1500ms-grensen)",
+            "kilde_id": "LOG-0151",
+            "fil": "data/logger.json"
+          }
+        ],
+        "kilder": [
+          "LOG-0083",
+          "LOG-0097",
+          "LOG-0151"
+        ]
+      }
+    },
+    {
+      "type": "runde",
+      "nummer": 2,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 8074,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 179,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sok_i_logger",
+      "input": {
+        "tjeneste": "betaling",
+        "fra": "02:50",
+        "til": "03:48",
+        "maks": 200
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "filtre": {
+            "tjeneste": "betaling",
+            "fra": "02:50",
+            "til": "03:48",
+            "maks": 200
+          },
+          "total": 42,
+          "returnert": 42,
+          "offset": 0,
+          "maks": 200,
+          "avkortet": false,
+          "neste_offset": null,
+          "første_treff": "2026-10-29T02:51:12+01:00",
+          "siste_treff": "2026-10-29T03:47:42+01:00",
+          "datavindu": {
+            "fra": "2026-10-29T02:30:04+01:00",
+            "til": "2026-10-29T03:48:05+01:00"
+          },
+          "merknad": null
+        },
+        "logger": [
+          {
+            "tid": "2026-10-29T02:51:12+01:00",
+            "tjeneste": "betaling",
+            "nivå": "INFO",
+            "melding": "utrulling startet: versjon 2.14.0 (release-tog natt-1029)",
+            "kilde_id": "LOG-0042",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:51:48+01:00",
+            "tjeneste": "betaling",
+            "nivå": "INFO",
+            "melding": "versjon 2.14.0 kjører på betaling-01, betaling-02, betaling-03",
+            "kilde_id": "LOG-0044",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:51:50+01:00",
+            "tjeneste": "betaling",
+            "nivå": "INFO",
+            "melding": "helsesjekk /helse OK",
+            "kilde_id": "LOG-0045",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:52:03+01:00",
+            "tjeneste": "betaling",
+            "nivå": "INFO",
+            "melding": "refusjon registrert id=r-785216",
+            "kilde_id": "LOG-0047",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:52:30+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-617248 kort=utenlandsk",
+            "kilde_id": "LOG-0048",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:54:34+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-364766 kort=utenlandsk",
+            "kilde_id": "LOG-0053",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:56:58+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-408988 kort=utenlandsk",
+            "kilde_id": "LOG-0057",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:59:15+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-434760 kort=utenlandsk",
+            "kilde_id": "LOG-0064",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:59:44+01:00",
+            "tjeneste": "betaling",
+            "nivå": "INFO",
+            "melding": "kortnett svarte på 340ms",
+            "kilde_id": "LOG-0066",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:01:53+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-803381 kort=utenlandsk",
+            "kilde_id": "LOG-0073",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:04:11+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-511869 kort=utenlandsk",
+            "kilde_id": "LOG-0078",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:05:00+01:00",
+            "tjeneste": "betaling",
+            "nivå": "WARN",
+            "melding": "feilrate 5xx siste 5 min: 6.1%",
+            "kilde_id": "LOG-0083",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:06:02+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-966566 kort=utenlandsk",
+            "kilde_id": "LOG-0085",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:08:09+01:00",
+            "tjeneste": "betaling",
+            "nivå": "INFO",
+            "melding": "kortnett svarte på 238ms",
+            "kilde_id": "LOG-0087",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:08:31+01:00",
+            "tjeneste": "betaling",
+            "nivå": "INFO",
+            "melding": "kortnett svarte på 282ms",
+            "kilde_id": "LOG-0092",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:08:53+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-413141 kort=utenlandsk",
+            "kilde_id": "LOG-0094",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:10:00+01:00",
+            "tjeneste": "betaling",
+            "nivå": "WARN",
+            "melding": "feilrate 5xx siste 5 min: 8.7%",
+            "kilde_id": "LOG-0097",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:11:25+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-161091 kort=utenlandsk",
+            "kilde_id": "LOG-0101",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:12:00+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "feilrate 5xx siste 5 min: 9.4% (terskel 5%)",
+            "kilde_id": "LOG-0103",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:12:20+01:00",
+            "tjeneste": "betaling",
+            "nivå": "INFO",
+            "melding": "betaling fullført id=b-169732 beløp=890 NOK",
+            "kilde_id": "LOG-0104",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:13:51+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-461454 kort=utenlandsk",
+            "kilde_id": "LOG-0109",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:14:29+01:00",
+            "tjeneste": "betaling",
+            "nivå": "INFO",
+            "melding": "kortnett svarte på 311ms",
+            "kilde_id": "LOG-0113",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:15:54+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-913933 kort=utenlandsk",
+            "kilde_id": "LOG-0114",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:18:00+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-425416 kort=utenlandsk",
+            "kilde_id": "LOG-0120",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:19:35+01:00",
+            "tjeneste": "betaling",
+            "nivå": "INFO",
+            "melding": "refusjon registrert id=r-537530",
+            "kilde_id": "LOG-0124",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:20:46+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-666983 kort=utenlandsk",
+            "kilde_id": "LOG-0125",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:23:31+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-836601 kort=utenlandsk",
+            "kilde_id": "LOG-0136",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:25:10+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-895821 kort=utenlandsk",
+            "kilde_id": "LOG-0144",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:26:40+01:00",
+            "tjeneste": "betaling",
+            "nivå": "WARN",
+            "melding": "kortnett svarte på 1840ms (over 1500ms-grensen)",
+            "kilde_id": "LOG-0151",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:27:09+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-374171 kort=utenlandsk",
+            "kilde_id": "LOG-0157",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:29:33+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-569943 kort=utenlandsk",
+            "kilde_id": "LOG-0168",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:31:40+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-816234 kort=utenlandsk",
+            "kilde_id": "LOG-0179",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:33:28+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-970820 kort=utenlandsk",
+            "kilde_id": "LOG-0189",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:36:18+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-895466 kort=utenlandsk",
+            "kilde_id": "LOG-0213",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:38:25+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-338453 kort=utenlandsk",
+            "kilde_id": "LOG-0222",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:40:42+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-413668 kort=utenlandsk",
+            "kilde_id": "LOG-0232",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:40:53+01:00",
+            "tjeneste": "betaling",
+            "nivå": "INFO",
+            "melding": "kortnett svarte på 191ms",
+            "kilde_id": "LOG-0234",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:41:46+01:00",
+            "tjeneste": "betaling",
+            "nivå": "INFO",
+            "melding": "betaling fullført id=b-458108 beløp=1968 NOK",
+            "kilde_id": "LOG-0238",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:43:22+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-267913 kort=utenlandsk",
+            "kilde_id": "LOG-0243",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:45:07+01:00",
+            "tjeneste": "betaling",
+            "nivå": "INFO",
+            "melding": "betaling fullført id=b-604359 beløp=2553 NOK",
+            "kilde_id": "LOG-0248",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:45:22+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-607171 kort=utenlandsk",
+            "kilde_id": "LOG-0249",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:47:42+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-815535 kort=utenlandsk",
+            "kilde_id": "LOG-0254",
+            "fil": "data/logger.json"
+          }
+        ],
+        "kilder": [
+          "LOG-0042",
+          "LOG-0044",
+          "LOG-0045",
+          "LOG-0047",
+          "LOG-0048",
+          "LOG-0053",
+          "LOG-0057",
+          "LOG-0064",
+          "LOG-0066",
+          "LOG-0073",
+          "LOG-0078",
+          "LOG-0083",
+          "LOG-0085",
+          "LOG-0087",
+          "LOG-0092",
+          "LOG-0094",
+          "LOG-0097",
+          "LOG-0101",
+          "LOG-0103",
+          "LOG-0104",
+          "LOG-0109",
+          "LOG-0113",
+          "LOG-0114",
+          "LOG-0120",
+          "LOG-0124",
+          "LOG-0125",
+          "LOG-0136",
+          "LOG-0144",
+          "LOG-0151",
+          "LOG-0157",
+          "LOG-0168",
+          "LOG-0179",
+          "LOG-0189",
+          "LOG-0213",
+          "LOG-0222",
+          "LOG-0232",
+          "LOG-0234",
+          "LOG-0238",
+          "LOG-0243",
+          "LOG-0248",
+          "LOG-0249",
+          "LOG-0254"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "hent_runbook",
+      "input": {
+        "tjeneste": "betaling"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "merknad": "Runbookens dato må kryssjekkes. En eldre anbefaling kan bygge på et oppsett som ikke lenger finnes."
+        },
+        "runbook": {
+          "kilde_id": "RUNBOOK-betaling",
+          "fil": "data/runbooks/betaling.md",
+          "tjeneste": "betaling",
+          "sist_oppdatert": "2026-08-20",
+          "innhold": "# Runbook: betaling\n\nSist oppdatert: 2026-08-20 (Team Myntkammer)\n\n## Høy feilrate (5xx)\n\n1. Sjekk om det er rullet ut en ny versjon den siste timen. Release-toget ruller ut automatisk om natta.\n2. Se etter `TypeError` eller `ReferenceError` i loggene. Det peker nesten alltid på ny kode.\n3. Hvis feilene startet rett etter en utrulling: rull tilbake med `deploy rollback betaling` til forrige versjon. Det tar ca 2 minutter.\n4. Hvis det ikke er en ny versjon: sjekk svartiden fra Kortnett. Treghet der gir timeout, ikke 5xx.\n\n## Hvem vekkes\n\nVakt i Team Myntkammer. Rollback kan gjøres av hvem som helst med vakt, men si fra i #betaling-drift.\n"
+        },
+        "kilder": [
+          "RUNBOOK-betaling"
+        ]
+      }
+    },
+    {
+      "type": "runde",
+      "nummer": 3,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 14351,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 2505,
+        "output_tokens_details": {
+          "thinking_tokens": 89
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "valideringsfeil",
+      "melding": "Ugyldig rapport (rapport.fakta[1].kilde_id): ukjent felt."
+    },
+    {
+      "type": "runde",
+      "nummer": 4,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 17186,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 2467,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "rapport",
+      "melding": "Rapportformat og kilde-ID-er er kontrollert."
+    }
+  ]
+}

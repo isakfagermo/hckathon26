@@ -1,4 +1,5 @@
 import { rapportDefinisjon, validerRapport } from './rapport.js';
+import { lagKontrollgrunnlag } from './kontroll.js';
 
 function heltall(env, navn, standard, min, maks) {
   const verdi = env[navn] === undefined ? standard : Number(env[navn]);
@@ -60,7 +61,7 @@ function feiltekst(feil) {
 
 export async function kjørAgent({
   system, oppgave, verktøy, ved, klient, konfig = lesAgentKonfig(),
-  signal = new AbortController().signal, onEvent = () => {},
+  signal = new AbortController().signal, onEvent = () => {}, kontrollerRapport = true,
 }) {
   if (!klient) {
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
@@ -81,6 +82,7 @@ export async function kjørAgent({
   let verktoykall = 0;
   let lesebudsjettStengt = false;
   let budsjettvarselSendt = false;
+  let kontrollStartet = false;
   const totalTokens = () => Object.values(bruk).reduce((a, b) => a + b, 0);
   const ferdig = (status, årsak, rapport = null) => ({
     status, årsak, rapport, ved, modus: 'modell', modell: konfig.modell,
@@ -93,7 +95,8 @@ Avslutt ved å kalle lever_rapport alene, aldri med bare fri tekst. Rapporten m�
 Hent alarm, relevante logger, avhengigheter/eierskap, endringshistorikk og ved behov runbooks og lignende hendelser før rapporten.
 Oppgi bekreftede fakta og alternative hypoteser/motbevis, hva som mangler, ansvarlig og verifisering av anbefalte tiltak.
 Kall flere uavhengige leseverktøy sammen. Les mer når metadata viser avkorting. Unngå identiske søk som allerede er besvart.
-Rapportvalidering kontrollerer format og kilde-ID, ikke sannheten i påstandene: du må selv kontrollere at hver kilde støtter teksten.`;
+Rapportvalidering kontrollerer format og kilde-ID, ikke sannheten i påstandene: du må selv kontrollere at hver kilde støtter teksten.
+${kontrollerRapport ? 'Første gyldige lever_rapport er et utkast. Du får en obligatorisk kontrollrunde med beregnet tidsgrunnlag. Kontroller og korriger utkastet, hent flere kilder ved behov og lever_rapport på nytt. Sett av budsjett til dette.' : ''}`;
 
   for (let i = 1; i <= konfig.maxIterasjoner; i++) {
     if (fristSignal.aborted) return ferdig('ufullstendig', signal.aborted ? 'Avbrutt av bruker.' : 'Samlet tidsgrense nådd.');
@@ -145,6 +148,14 @@ Rapportvalidering kontrollerer format og kilde-ID, ikke sannheten i påstandene:
     if (rapportkall.length === 1 && kall.length === 1) {
       try {
         const rapport = validerRapport(kall[0].input, { kilder });
+        if (kontrollerRapport && !kontrollStartet) {
+          kontrollStartet = true;
+          const grunnlag = lagKontrollgrunnlag({ kilder, spor, ved });
+          emit({ type: 'kontroll', melding: 'Utkast mottatt. Kontrollerer motbevis, tidsgrenser og kildegrunnlag.', grunnlag });
+          messages.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: kall[0].id,
+            content: JSON.stringify({ status: 'utkast_til_kontroll', beskjed: 'Rapporten er ikke godkjent ennå. Utfør sjekklisten, bruk leseverktøy ved behov, og lever korrigert rapport. Skriv tydelige begrensninger når du mangler belegg.', ...grunnlag }) }] });
+          continue;
+        }
         emit({ type: 'rapport', melding: 'Rapportformat og kilde-ID-er er kontrollert.' });
         return ferdig('ok', null, rapport);
       } catch (e) {

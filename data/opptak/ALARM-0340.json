@@ -1,0 +1,2115 @@
+{
+  "alarmId": "ALARM-0340",
+  "status": "ok",
+  "årsak": null,
+  "rapport": {
+    "tittel": "ALARM-0340: 504 på api-gateway skyldes sannsynlig VACUUM FULL på sesjoner i kunde-db, som låser innlogging og tømmer tilkoblingene",
+    "alvorlighet": "kritisk",
+    "status": "pågår",
+    "berorte_tjenester": [
+      "api-gateway",
+      "innlogging",
+      "kunde-db"
+    ],
+    "fakta": [
+      {
+        "tekst": "ALARM-0340 kl 03:40: 17,2 % 504 siste 5 min (terskel 5 %). Gateway-loggen sier at de fleste 504-ene kommer fra upstream innlogging.",
+        "kilder": [
+          "ALARM-0340",
+          "LOG-0228"
+        ]
+      },
+      {
+        "tekst": "Kl 03:30 startet cron «ukentlig-vedlikehold» i kunde-db (VACUUM FULL og REINDEX på sesjoner). Den tok AccessExclusiveLock på sesjoner (41 GB). Cron-tiden ble flyttet fra søndag 04:00 til torsdag 03:30 den 22.10. 29.10 er en torsdag.",
+        "kilder": [
+          "LOG-0170",
+          "LOG-0171",
+          "DEPLOY-003"
+        ]
+      },
+      {
+        "tekst": "Fra 03:31 ventet innloggingsprosesser på låsen. Aktive tilkoblinger steg fra 88 til 141, 187 og 198 av 200 mellom 03:31 og 03:34. Fra 03:34:40 kom FATAL «remaining connection slots are reserved» gjentatte ganger, siste gang kl 03:41.",
+        "kilder": [
+          "LOG-0175",
+          "LOG-0178",
+          "LOG-0185",
+          "LOG-0191",
+          "LOG-0197",
+          "LOG-0199",
+          "LOG-0235"
+        ]
+      },
+      {
+        "tekst": "Innlogging rapporterte stadig tregere sesjonsspørringer: 2,4 s kl 03:31, 21 s kl 03:39. Fra 03:35 kom «too many connections»-feil. Før 03:30 var det 31–60 aktive tilkoblinger.",
+        "kilder": [
+          "LOG-0177",
+          "LOG-0226",
+          "LOG-0204",
+          "LOG-0229",
+          "LOG-0132",
+          "LOG-0134"
+        ]
+      },
+      {
+        "tekst": "Kl 03:44 var VACUUM FULL 38 % ferdig, og det finnes ingen logg om at den er ferdig. Innlogging viste likevel noen vellykkede innlogginger og tokenfornyelser kl 03:42–03:45. Det beviser ikke at alle brukere eller kall fungerer.",
+        "kilder": [
+          "LOG-0244",
+          "LOG-0240",
+          "LOG-0241",
+          "LOG-0247"
+        ]
+      },
+      {
+        "tekst": "Runbooken for kunde-db er fra 2025-11-04. Den antar pgbouncer og vedlikehold søndag 04:00. Katalogen sier at pgbouncer ble fjernet 12.03.2026, og cron er flyttet. Runbooken er derfor utdatert på begge punkter.",
+        "kilder": [
+          "RUNBOOK-kunde-db",
+          "TJENESTE-kunde-db",
+          "INC-2026-014",
+          "DEPLOY-003"
+        ]
+      }
+    ],
+    "hypoteser": [
+      {
+        "tekst": "Årsak: den flyttede cron-jobben (VACUUM FULL/REINDEX på sesjoner) holder en eksklusiv lås. Innloggingsspørringer hoper seg opp og bruker opp de 200 tilkoblingene. Innlogging gir da timeout, og gatewayen svarer 504 på Min side-kall.",
+        "sikkerhet": "middels",
+        "kilder": [
+          "LOG-0170",
+          "LOG-0171",
+          "LOG-0175",
+          "LOG-0197",
+          "LOG-0228",
+          "DEPLOY-003"
+        ],
+        "motbevis": [
+          "Det er ikke målt direkte at 504-ene er fordelt på Min side-ruter.",
+          "Innlogging klarte noen kall kl 03:42–03:45 mens vedlikeholdet fortsatt gikk.",
+          "Tilkoblingstallene etter 03:34 mangler, så vi vet ikke om metningen fortsatt pågikk."
+        ]
+      }
+    ],
+    "usikkerhet": [
+      "Andre uavhengige forhold som ikke er undersøkt som årsak til alarmen: (a) betaling 2.14.0 (DEPLOY-009) gir TypeError i beregnGebyr for utenlandske kort, f.eks. LOG-0254. (b) SMS-leveringsraten var 58 % kl 03:31 (LOG-0174). Det kan henge sammen med varsling-endringen i DEPLOY-005, men det er ikke undersøkt.",
+      "Betalingsfeilen starter kl 03:25, før lås og tilkoblingsmetning. Den er derfor ikke forklaringen på tilkoblingsproblemet.",
+      "Det er ukjent hvor stor andel av 504-ene som gjelder Min side, og hvor mange tilkoblinger som er i bruk nå. Observasjonene slutter 03:48, og det finnes ingen logg om at vedlikeholdet er ferdig eller avbrutt.",
+      "Det er ikke undersøkt om innlogging-klienten har tilkoblingstimeout eller pool-grense som forverrer metningen."
+    ],
+    "neste_steg": [
+      {
+        "tiltak": "Vekk vakt i Team Grunnmur (Even Gravdal, sekundær Rune Skjelbred). De må vurdere å avbryte pågående VACUUM FULL/REINDEX på sesjoner og kjøre jobben i et lavtrafikkvindu. Ikke følg runbookens pgbouncer-steg, for pgbouncer finnes ikke lenger.",
+        "ansvarlig": "Team Grunnmur, kunde-db-vakt (Even Gravdal)",
+        "verifisering": "Kontroller at låsventingene på sesjoner opphører, at aktive tilkoblinger faller tilbake mot normalnivå (31–60 av 200 før 03:30), og at FATAL-feilene stopper. Kontroller at 504-andelen over en måleperiode på minst 5 min holder seg under terskelen på 5 %.",
+        "kilder": [
+          "LOG-0170",
+          "LOG-0171",
+          "LOG-0197",
+          "LOG-0132",
+          "LOG-0134",
+          "TJENESTE-kunde-db"
+        ]
+      },
+      {
+        "tiltak": "Informer Team Nøkkelknippe (Hedda Uglevik) og Team Portvokter (Trond Benrangel) om at gatewayens 504-er trolig kommer fra innlogging. Oppdater runbooken for kunde-db (pgbouncer og cron-tid) og vurder å flytte vedlikeholdsvinduet.",
+        "ansvarlig": "Team Grunnmur med Team Nøkkelknippe og Team Portvokter",
+        "verifisering": "Kontroller at innlogging fungerer normalt over en målt periode, og at runbooken beskriver dagens oppsett uten pgbouncer og med torsdag 03:30.",
+        "kilder": [
+          "LOG-0228",
+          "RUNBOOK-kunde-db",
+          "DEPLOY-003"
+        ]
+      }
+    ],
+    "eskalering": "Kritisk alarm med brukerpåvirkning. Vekk primærvakt i Team Grunnmur (Even Gravdal), og sekundær (Rune Skjelbred) hvis det ikke kommer svar. Informer Team Nøkkelknippe (Hedda Uglevik) og Team Portvokter (Trond Benrangel). Betalingsfeilen (Team Myntkammer, Sigrid Gravlund) og SMS-raten (Team Ugla, Jonas Kistesen) er egne spor, og de er ikke utredet her."
+  },
+  "ved": "2026-10-29T03:48:05+01:00",
+  "modus": "modell",
+  "modell": "claude-sonnet-5-5",
+  "iterasjoner": 4,
+  "verktoykall": 8,
+  "bruk": {
+    "input_tokens": 62401,
+    "output_tokens": 6318,
+    "cache_read_input_tokens": 0,
+    "cache_creation_input_tokens": 0
+  },
+  "kilder": [
+    {
+      "id": "ALARM-0340",
+      "tid": "2026-10-29T03:40:00+01:00",
+      "tjeneste": "api-gateway",
+      "alvorlighet": "kritisk",
+      "tittel": "Mange 504 Gateway Timeout",
+      "tekst": "api-gateway: 17.2 % av kallene siste 5 min ender i 504 (terskel 5 %). Brukere melder at de ikke kommer inn på Min side.",
+      "kilde_id": "ALARM-0340",
+      "fil": "data/alarmer.json"
+    },
+    {
+      "navn": "api-gateway",
+      "beskrivelse": "Inngangen for alle kall fra app og nett. Ruter videre til tjenestene bak. Timeout 30 s per kall (60 s for /api/rapport).",
+      "eier_team": "Team Portvokter",
+      "vakt": {
+        "primær": "Trond Benrangel",
+        "sekundær": "Ida Nattmo"
+      },
+      "avhengigheter": [
+        "innlogging",
+        "betaling",
+        "sok",
+        "varsling"
+      ],
+      "kilde_id": "TJENESTE-api-gateway",
+      "fil": "data/tjenester.json"
+    },
+    {
+      "navn": "innlogging",
+      "beskrivelse": "Innlogging, sesjoner og engangskoder. Sesjonene lagres i tabellen sesjoner i kunde-db.",
+      "eier_team": "Team Nøkkelknippe",
+      "vakt": {
+        "primær": "Hedda Uglevik",
+        "sekundær": "Petter Mørkeskog"
+      },
+      "avhengigheter": [
+        "kunde-db",
+        "varsling"
+      ],
+      "kilde_id": "TJENESTE-innlogging",
+      "fil": "data/tjenester.json"
+    },
+    {
+      "navn": "betaling",
+      "beskrivelse": "Kortbetaling og refusjon. Snakker med ekstern kortleverandør Kortnett.",
+      "eier_team": "Team Myntkammer",
+      "vakt": {
+        "primær": "Sigrid Gravlund",
+        "sekundær": "Ola Benkvist"
+      },
+      "avhengigheter": [
+        "kunde-db",
+        "Kortnett (ekstern)"
+      ],
+      "kilde_id": "TJENESTE-betaling",
+      "fil": "data/tjenester.json"
+    },
+    {
+      "navn": "sok",
+      "beskrivelse": "Produktsøk. Egen søkeklynge med tre noder (sok-node-1, -2, -3). Nattlig reindeks kl 03:00.",
+      "eier_team": "Team Spåkula",
+      "vakt": {
+        "primær": "Mina Spøkelsesen",
+        "sekundær": "Arne Lyktemann"
+      },
+      "avhengigheter": [],
+      "kilde_id": "TJENESTE-sok",
+      "fil": "data/tjenester.json"
+    },
+    {
+      "navn": "varsling",
+      "beskrivelse": "Sender SMS (via SmsBud), e-post og push. Engangskoder for innlogging går herfra.",
+      "eier_team": "Team Ugla",
+      "vakt": {
+        "primær": "Jonas Kistesen",
+        "sekundær": "Live Huldersen"
+      },
+      "avhengigheter": [
+        "SmsBud (ekstern)"
+      ],
+      "kilde_id": "TJENESTE-varsling",
+      "fil": "data/tjenester.json"
+    },
+    {
+      "navn": "kunde-db",
+      "beskrivelse": "Felles PostgreSQL for innlogging og betaling. Maks 200 tilkoblinger. Applikasjonene kobler direkte til databasen (pgbouncer ble fjernet 12. mars 2026). Ukentlig vedlikehold via cron.",
+      "eier_team": "Team Grunnmur",
+      "vakt": {
+        "primær": "Even Gravdal",
+        "sekundær": "Rune Skjelbred"
+      },
+      "avhengigheter": [],
+      "kilde_id": "TJENESTE-kunde-db",
+      "fil": "data/tjenester.json"
+    },
+    {
+      "tid": "2026-10-29T03:25:10+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-895821 kort=utenlandsk",
+      "kilde_id": "LOG-0144",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:27:09+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-374171 kort=utenlandsk",
+      "kilde_id": "LOG-0157",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:29:33+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-569943 kort=utenlandsk",
+      "kilde_id": "LOG-0168",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:31:00+01:00",
+      "tjeneste": "varsling",
+      "nivå": "ERROR",
+      "melding": "SMS-leveringsrate siste 10 min: 58% (terskel 90%)",
+      "kilde_id": "LOG-0174",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:31:40+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-816234 kort=utenlandsk",
+      "kilde_id": "LOG-0179",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:33:28+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-970820 kort=utenlandsk",
+      "kilde_id": "LOG-0189",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:34:40+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "ERROR",
+      "melding": "FATAL: remaining connection slots are reserved for non-replication superuser connections",
+      "kilde_id": "LOG-0199",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:35:05+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "ERROR",
+      "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+      "kilde_id": "LOG-0204",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:35:22+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "ERROR",
+      "melding": "FATAL: remaining connection slots are reserved for non-replication superuser connections",
+      "kilde_id": "LOG-0205",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:36:10+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "ERROR",
+      "melding": "FATAL: remaining connection slots are reserved for non-replication superuser connections",
+      "kilde_id": "LOG-0212",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:36:18+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-895466 kort=utenlandsk",
+      "kilde_id": "LOG-0213",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:36:30+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "ERROR",
+      "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+      "kilde_id": "LOG-0215",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:38:25+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-338453 kort=utenlandsk",
+      "kilde_id": "LOG-0222",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:38:45+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "ERROR",
+      "melding": "FATAL: remaining connection slots are reserved for non-replication superuser connections",
+      "kilde_id": "LOG-0223",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:40:00+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "ERROR",
+      "melding": "504-andel siste 5 min: 17.2% (terskel 5%), mest upstream=innlogging",
+      "kilde_id": "LOG-0228",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:40:12+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "ERROR",
+      "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+      "kilde_id": "LOG-0229",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:40:42+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-413668 kort=utenlandsk",
+      "kilde_id": "LOG-0232",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:41:03+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "ERROR",
+      "melding": "FATAL: remaining connection slots are reserved for non-replication superuser connections",
+      "kilde_id": "LOG-0235",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:43:22+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-267913 kort=utenlandsk",
+      "kilde_id": "LOG-0243",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:45:22+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-607171 kort=utenlandsk",
+      "kilde_id": "LOG-0249",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:47:42+01:00",
+      "tjeneste": "betaling",
+      "nivå": "ERROR",
+      "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-815535 kort=utenlandsk",
+      "kilde_id": "LOG-0254",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:51:12+01:00",
+      "tjeneste": "betaling",
+      "versjon": "2.14.0",
+      "av": "Release-tog natt-1029",
+      "endring": "Ny gebyrberegning for utenlandske kort. Valuta hentes nå fra kortinfo-objektet i stedet for fra transaksjonen.",
+      "kilde_id": "DEPLOY-009",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-28T14:02:00+01:00",
+      "tjeneste": "api-gateway",
+      "versjon": "konfig timeouts.yaml r17",
+      "av": "Trond Benrangel",
+      "endring": "Økt timeout for /api/rapport fra 30 s til 60 s. Andre ruter uendret (30 s).",
+      "kilde_id": "DEPLOY-008",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-28T09:45:00+01:00",
+      "tjeneste": "innlogging",
+      "versjon": "4.8.1",
+      "av": "Hedda Uglevik",
+      "endring": "Retter tekst i feilmelding ved utløpt engangskode.",
+      "kilde_id": "DEPLOY-007",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-27T14:10:00+01:00",
+      "tjeneste": "sok",
+      "versjon": "3.9.1",
+      "av": "Mina Spøkelsesen",
+      "endring": "Ny synonymliste for høstkampanjen.",
+      "kilde_id": "DEPLOY-006",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-26T11:30:00+01:00",
+      "tjeneste": "varsling",
+      "versjon": "1.22.0",
+      "av": "Jonas Kistesen",
+      "endring": "Oppgradert SmsBud-klient fra 3.1 til 3.2. Ny retry-policy: 5 forsøk med kort pause (før: 3 forsøk med eksponentiell pause).",
+      "kilde_id": "DEPLOY-005",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-23T15:22:00+02:00",
+      "tjeneste": "sok",
+      "versjon": "3.9.0",
+      "av": "Mina Spøkelsesen",
+      "endring": "Ny rangering av treff (mer vekt på lagerstatus).",
+      "kilde_id": "DEPLOY-004",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-22T09:05:00+02:00",
+      "tjeneste": "kunde-db",
+      "versjon": "cron-konfig r41",
+      "av": "Even Gravdal",
+      "endring": "Flyttet ukentlig-vedlikehold fra søndag 04:00 til torsdag 03:30 for å unngå kollisjon med søndagsbackup.",
+      "kilde_id": "DEPLOY-003",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-21T13:40:00+02:00",
+      "tjeneste": "betaling",
+      "versjon": "2.13.2",
+      "av": "Release-tog",
+      "endring": "Oppdatert avhengigheter, ingen funksjonelle endringer.",
+      "kilde_id": "DEPLOY-002",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-20T10:14:00+02:00",
+      "tjeneste": "innlogging",
+      "versjon": "4.8.0",
+      "av": "Hedda Uglevik",
+      "endring": "Passkey som innloggingsmetode for alle brukere.",
+      "kilde_id": "DEPLOY-001",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-29T03:00:05+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "INFO",
+      "melding": "checkpoint fullført: skrev 377 buffere",
+      "kilde_id": "LOG-0069",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:02:30+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "INFO",
+      "melding": "arkivering av WAL-segment 0000000100000A3F ok",
+      "kilde_id": "LOG-0076",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:11:20+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "INFO",
+      "melding": "checkpoint fullført: skrev 113 buffere",
+      "kilde_id": "LOG-0099",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:12:35+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "INFO",
+      "melding": "checkpoint fullført: skrev 536 buffere",
+      "kilde_id": "LOG-0106",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:22:20+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "INFO",
+      "melding": "tilkoblinger aktive=60/200",
+      "kilde_id": "LOG-0132",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:23:11+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "INFO",
+      "melding": "tilkoblinger aktive=31/200",
+      "kilde_id": "LOG-0134",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:23:19+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "INFO",
+      "melding": "autovacuum: tabell \"betalinger\" ferdig",
+      "kilde_id": "LOG-0135",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:26:33+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "INFO",
+      "melding": "autovacuum: tabell \"betalinger\" ferdig",
+      "kilde_id": "LOG-0150",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:30:00+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "INFO",
+      "melding": "cron: ukentlig-vedlikehold startet (VACUUM FULL sesjoner, REINDEX sesjoner)",
+      "kilde_id": "LOG-0170",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:30:01+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "INFO",
+      "melding": "VACUUM FULL sesjoner: tar AccessExclusiveLock på relasjon \"sesjoner\" (41 GB)",
+      "kilde_id": "LOG-0171",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:30:55+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "INFO",
+      "melding": "autovacuum: tabell \"betalinger\" ferdig",
+      "kilde_id": "LOG-0173",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:31:05+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "WARN",
+      "melding": "prosess 5385 venter på AccessExclusiveLock på relasjon \"sesjoner\" etter 5000 ms (bruker=innlogging)",
+      "kilde_id": "LOG-0175",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:31:30+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "INFO",
+      "melding": "tilkoblinger aktive=88/200",
+      "kilde_id": "LOG-0178",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:31:50+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "WARN",
+      "melding": "prosess 6749 venter på AccessExclusiveLock på relasjon \"sesjoner\" etter 5000 ms (bruker=innlogging)",
+      "kilde_id": "LOG-0181",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:32:30+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "INFO",
+      "melding": "tilkoblinger aktive=141/200",
+      "kilde_id": "LOG-0185",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:32:40+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "WARN",
+      "melding": "prosess 4258 venter på AccessExclusiveLock på relasjon \"sesjoner\" etter 5000 ms (bruker=innlogging)",
+      "kilde_id": "LOG-0186",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:33:15+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "WARN",
+      "melding": "prosess 3919 venter på AccessExclusiveLock på relasjon \"sesjoner\" etter 5000 ms (bruker=innlogging)",
+      "kilde_id": "LOG-0188",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:33:30+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "WARN",
+      "melding": "tilkoblinger aktive=187/200",
+      "kilde_id": "LOG-0191",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:34:05+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "WARN",
+      "melding": "prosess 9028 venter på AccessExclusiveLock på relasjon \"sesjoner\" etter 5000 ms (bruker=innlogging)",
+      "kilde_id": "LOG-0194",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:34:30+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "WARN",
+      "melding": "tilkoblinger aktive=198/200",
+      "kilde_id": "LOG-0197",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:35:27+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "INFO",
+      "melding": "checkpoint fullført: skrev 622 buffere",
+      "kilde_id": "LOG-0206",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:44:00+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "INFO",
+      "melding": "VACUUM FULL sesjoner: 38% ferdig",
+      "kilde_id": "LOG-0244",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:48:05+01:00",
+      "tjeneste": "kunde-db",
+      "nivå": "INFO",
+      "melding": "checkpoint fullført: skrev 423 buffere",
+      "kilde_id": "LOG-0256",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:00:01+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "cron: loggrotasjon startet på innlogging-02 (komprimerer /var/log/innlogging)",
+      "kilde_id": "LOG-0068",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:02:09+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "token fornyet bruker=769834",
+      "kilde_id": "LOG-0075",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:03:30+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "disk /var 87% på innlogging-02",
+      "kilde_id": "LOG-0077",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:04:50+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "disk /var 91% på innlogging-02",
+      "kilde_id": "LOG-0082",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:09:12+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "loggrotasjon fullført på innlogging-02: frigjort 11.8 GB, disk /var 54%",
+      "kilde_id": "LOG-0095",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:09:13+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "arkiv lastet opp: innlogging-02-2026-10-28.tar.gz (12.4 GB)",
+      "kilde_id": "LOG-0096",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:10:17+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "token fornyet bruker=345254",
+      "kilde_id": "LOG-0098",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:13:04+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "innlogging ok bruker=190357 metode=passord+sms",
+      "kilde_id": "LOG-0107",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:24:23+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "token fornyet bruker=844522",
+      "kilde_id": "LOG-0142",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:26:43+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "innlogging ok bruker=715841 metode=passord+sms",
+      "kilde_id": "LOG-0152",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:28:00+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "innlogging ok bruker=648332 metode=passkey",
+      "kilde_id": "LOG-0161",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:28:05+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "engangskode-SMS ikke bekreftet levert innen 60s bruker=718220",
+      "kilde_id": "LOG-0164",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:31:20+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 2.4s",
+      "kilde_id": "LOG-0177",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:31:59+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "utlogget bruker=450467",
+      "kilde_id": "LOG-0182",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:32:15+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 5.5s",
+      "kilde_id": "LOG-0184",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:33:05+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 8.6s",
+      "kilde_id": "LOG-0187",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:34:12+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 11.7s",
+      "kilde_id": "LOG-0195",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:35:40+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 14.8s",
+      "kilde_id": "LOG-0208",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:37:01+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 17.9s",
+      "kilde_id": "LOG-0216",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:37:40+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "engangskode-SMS ikke bekreftet levert innen 60s bruker=302917",
+      "kilde_id": "LOG-0218",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:39:30+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 21.0s",
+      "kilde_id": "LOG-0226",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:40:21+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "utlogget bruker=105349",
+      "kilde_id": "LOG-0230",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:42:10+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "innlogging ok bruker=367982 metode=passord+sms",
+      "kilde_id": "LOG-0240",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:42:22+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "token fornyet bruker=281070",
+      "kilde_id": "LOG-0241",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:45:01+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "token fornyet bruker=798850",
+      "kilde_id": "LOG-0247",
+      "fil": "data/logger.json"
+    },
+    {
+      "kilde_id": "RUNBOOK-kunde-db",
+      "fil": "data/runbooks/kunde-db.md",
+      "tjeneste": "kunde-db",
+      "sist_oppdatert": "2025-11-04",
+      "innhold": "# Runbook: kunde-db\n\nSist oppdatert: 2025-11-04 (Team Grunnmur)\n\n## For mange tilkoblinger / timeout\n\nAlle tjenester kobler til kunde-db via pgbouncer på db-proxy-01.\n\n1. Logg inn på db-proxy-01 og sjekk `SHOW POOLS;` i pgbouncer.\n2. Hvis pgbouncer henger: `systemctl restart pgbouncer`. Det tar ca 10 sekunder og løser det i de fleste tilfeller.\n3. Hvis det ikke hjelper: bytt til lesereplika kunde-db-replika-2 med `dbctl failover replika-2`.\n\n## Ukentlig vedlikehold\n\nKjøres søndag kl 04:00 (VACUUM og REINDEX). Ingen påvirkning på trafikk på den tiden.\n\n## Hvem vekkes\n\nVakt i Team Grunnmur.\n"
+    },
+    {
+      "id": "INC-2026-014",
+      "dato": "2026-03-11",
+      "tjeneste": "kunde-db",
+      "alvorlighet": "kritisk",
+      "tittel": "Tilkoblingene brukt opp, innlogging nede",
+      "sammendrag": "pgbouncer på db-proxy-01 gikk tom for minne og sluttet å slippe gjennom tilkoblinger. Innlogging og betaling fikk timeout. Løst ved å restarte pgbouncer.",
+      "rotårsak": "Minnelekkasje i pgbouncer.",
+      "tiltak": "Restart av pgbouncer. Besluttet å fjerne pgbouncer og koble direkte til kunde-db (gjort 12. mars).",
+      "varighet_min": 41,
+      "kilde_id": "INC-2026-014",
+      "fil": "data/hendelser.json"
+    }
+  ],
+  "spor": [
+    {
+      "type": "runde",
+      "nummer": 1,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 6103,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 218,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "hent_alarmer",
+      "input": {
+        "id": "ALARM-0340"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 1
+        },
+        "alarmer": [
+          {
+            "id": "ALARM-0340",
+            "tid": "2026-10-29T03:40:00+01:00",
+            "tjeneste": "api-gateway",
+            "alvorlighet": "kritisk",
+            "tittel": "Mange 504 Gateway Timeout",
+            "tekst": "api-gateway: 17.2 % av kallene siste 5 min ender i 504 (terskel 5 %). Brukere melder at de ikke kommer inn på Min side.",
+            "kilde_id": "ALARM-0340",
+            "fil": "data/alarmer.json"
+          }
+        ],
+        "kilder": [
+          "ALARM-0340"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "hent_tjenesteinfo",
+      "input": {},
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 6,
+          "merknad": "Tjenestekatalogen er udatert. Historisk korrekthet ved eldre observasjonstid kan ikke bekreftes."
+        },
+        "tjenester": [
+          {
+            "navn": "api-gateway",
+            "beskrivelse": "Inngangen for alle kall fra app og nett. Ruter videre til tjenestene bak. Timeout 30 s per kall (60 s for /api/rapport).",
+            "eier_team": "Team Portvokter",
+            "vakt": {
+              "primær": "Trond Benrangel",
+              "sekundær": "Ida Nattmo"
+            },
+            "avhengigheter": [
+              "innlogging",
+              "betaling",
+              "sok",
+              "varsling"
+            ],
+            "kilde_id": "TJENESTE-api-gateway",
+            "fil": "data/tjenester.json"
+          },
+          {
+            "navn": "innlogging",
+            "beskrivelse": "Innlogging, sesjoner og engangskoder. Sesjonene lagres i tabellen sesjoner i kunde-db.",
+            "eier_team": "Team Nøkkelknippe",
+            "vakt": {
+              "primær": "Hedda Uglevik",
+              "sekundær": "Petter Mørkeskog"
+            },
+            "avhengigheter": [
+              "kunde-db",
+              "varsling"
+            ],
+            "kilde_id": "TJENESTE-innlogging",
+            "fil": "data/tjenester.json"
+          },
+          {
+            "navn": "betaling",
+            "beskrivelse": "Kortbetaling og refusjon. Snakker med ekstern kortleverandør Kortnett.",
+            "eier_team": "Team Myntkammer",
+            "vakt": {
+              "primær": "Sigrid Gravlund",
+              "sekundær": "Ola Benkvist"
+            },
+            "avhengigheter": [
+              "kunde-db",
+              "Kortnett (ekstern)"
+            ],
+            "kilde_id": "TJENESTE-betaling",
+            "fil": "data/tjenester.json"
+          },
+          {
+            "navn": "sok",
+            "beskrivelse": "Produktsøk. Egen søkeklynge med tre noder (sok-node-1, -2, -3). Nattlig reindeks kl 03:00.",
+            "eier_team": "Team Spåkula",
+            "vakt": {
+              "primær": "Mina Spøkelsesen",
+              "sekundær": "Arne Lyktemann"
+            },
+            "avhengigheter": [],
+            "kilde_id": "TJENESTE-sok",
+            "fil": "data/tjenester.json"
+          },
+          {
+            "navn": "varsling",
+            "beskrivelse": "Sender SMS (via SmsBud), e-post og push. Engangskoder for innlogging går herfra.",
+            "eier_team": "Team Ugla",
+            "vakt": {
+              "primær": "Jonas Kistesen",
+              "sekundær": "Live Huldersen"
+            },
+            "avhengigheter": [
+              "SmsBud (ekstern)"
+            ],
+            "kilde_id": "TJENESTE-varsling",
+            "fil": "data/tjenester.json"
+          },
+          {
+            "navn": "kunde-db",
+            "beskrivelse": "Felles PostgreSQL for innlogging og betaling. Maks 200 tilkoblinger. Applikasjonene kobler direkte til databasen (pgbouncer ble fjernet 12. mars 2026). Ukentlig vedlikehold via cron.",
+            "eier_team": "Team Grunnmur",
+            "vakt": {
+              "primær": "Even Gravdal",
+              "sekundær": "Rune Skjelbred"
+            },
+            "avhengigheter": [],
+            "kilde_id": "TJENESTE-kunde-db",
+            "fil": "data/tjenester.json"
+          }
+        ],
+        "kilder": [
+          "TJENESTE-api-gateway",
+          "TJENESTE-innlogging",
+          "TJENESTE-betaling",
+          "TJENESTE-sok",
+          "TJENESTE-varsling",
+          "TJENESTE-kunde-db"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sok_i_logger",
+      "input": {
+        "fra": "03:25",
+        "niva": "ERROR",
+        "maks": 100
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "filtre": {
+            "fra": "03:25",
+            "niva": "ERROR",
+            "maks": 100
+          },
+          "total": 21,
+          "returnert": 21,
+          "offset": 0,
+          "maks": 100,
+          "avkortet": false,
+          "neste_offset": null,
+          "første_treff": "2026-10-29T03:25:10+01:00",
+          "siste_treff": "2026-10-29T03:47:42+01:00",
+          "datavindu": {
+            "fra": "2026-10-29T02:30:04+01:00",
+            "til": "2026-10-29T03:48:05+01:00"
+          },
+          "merknad": null
+        },
+        "logger": [
+          {
+            "tid": "2026-10-29T03:25:10+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-895821 kort=utenlandsk",
+            "kilde_id": "LOG-0144",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:27:09+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-374171 kort=utenlandsk",
+            "kilde_id": "LOG-0157",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:29:33+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-569943 kort=utenlandsk",
+            "kilde_id": "LOG-0168",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:31:00+01:00",
+            "tjeneste": "varsling",
+            "nivå": "ERROR",
+            "melding": "SMS-leveringsrate siste 10 min: 58% (terskel 90%)",
+            "kilde_id": "LOG-0174",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:31:40+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-816234 kort=utenlandsk",
+            "kilde_id": "LOG-0179",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:33:28+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-970820 kort=utenlandsk",
+            "kilde_id": "LOG-0189",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:34:40+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "ERROR",
+            "melding": "FATAL: remaining connection slots are reserved for non-replication superuser connections",
+            "kilde_id": "LOG-0199",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:35:05+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "ERROR",
+            "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+            "kilde_id": "LOG-0204",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:35:22+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "ERROR",
+            "melding": "FATAL: remaining connection slots are reserved for non-replication superuser connections",
+            "kilde_id": "LOG-0205",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:36:10+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "ERROR",
+            "melding": "FATAL: remaining connection slots are reserved for non-replication superuser connections",
+            "kilde_id": "LOG-0212",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:36:18+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-895466 kort=utenlandsk",
+            "kilde_id": "LOG-0213",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:36:30+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "ERROR",
+            "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+            "kilde_id": "LOG-0215",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:38:25+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-338453 kort=utenlandsk",
+            "kilde_id": "LOG-0222",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:38:45+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "ERROR",
+            "melding": "FATAL: remaining connection slots are reserved for non-replication superuser connections",
+            "kilde_id": "LOG-0223",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:40:00+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "ERROR",
+            "melding": "504-andel siste 5 min: 17.2% (terskel 5%), mest upstream=innlogging",
+            "kilde_id": "LOG-0228",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:40:12+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "ERROR",
+            "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+            "kilde_id": "LOG-0229",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:40:42+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-413668 kort=utenlandsk",
+            "kilde_id": "LOG-0232",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:41:03+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "ERROR",
+            "melding": "FATAL: remaining connection slots are reserved for non-replication superuser connections",
+            "kilde_id": "LOG-0235",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:43:22+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-267913 kort=utenlandsk",
+            "kilde_id": "LOG-0243",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:45:22+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-607171 kort=utenlandsk",
+            "kilde_id": "LOG-0249",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:47:42+01:00",
+            "tjeneste": "betaling",
+            "nivå": "ERROR",
+            "melding": "TypeError: Cannot read properties of undefined (reading 'valuta') i beregnGebyr (gebyr.js:88) id=b-815535 kort=utenlandsk",
+            "kilde_id": "LOG-0254",
+            "fil": "data/logger.json"
+          }
+        ],
+        "kilder": [
+          "LOG-0144",
+          "LOG-0157",
+          "LOG-0168",
+          "LOG-0174",
+          "LOG-0179",
+          "LOG-0189",
+          "LOG-0199",
+          "LOG-0204",
+          "LOG-0205",
+          "LOG-0212",
+          "LOG-0213",
+          "LOG-0215",
+          "LOG-0222",
+          "LOG-0223",
+          "LOG-0228",
+          "LOG-0229",
+          "LOG-0232",
+          "LOG-0235",
+          "LOG-0243",
+          "LOG-0249",
+          "LOG-0254"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sjekk_deploy_historikk",
+      "input": {},
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 9
+        },
+        "deployer": [
+          {
+            "tid": "2026-10-29T02:51:12+01:00",
+            "tjeneste": "betaling",
+            "versjon": "2.14.0",
+            "av": "Release-tog natt-1029",
+            "endring": "Ny gebyrberegning for utenlandske kort. Valuta hentes nå fra kortinfo-objektet i stedet for fra transaksjonen.",
+            "kilde_id": "DEPLOY-009",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-28T14:02:00+01:00",
+            "tjeneste": "api-gateway",
+            "versjon": "konfig timeouts.yaml r17",
+            "av": "Trond Benrangel",
+            "endring": "Økt timeout for /api/rapport fra 30 s til 60 s. Andre ruter uendret (30 s).",
+            "kilde_id": "DEPLOY-008",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-28T09:45:00+01:00",
+            "tjeneste": "innlogging",
+            "versjon": "4.8.1",
+            "av": "Hedda Uglevik",
+            "endring": "Retter tekst i feilmelding ved utløpt engangskode.",
+            "kilde_id": "DEPLOY-007",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-27T14:10:00+01:00",
+            "tjeneste": "sok",
+            "versjon": "3.9.1",
+            "av": "Mina Spøkelsesen",
+            "endring": "Ny synonymliste for høstkampanjen.",
+            "kilde_id": "DEPLOY-006",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-26T11:30:00+01:00",
+            "tjeneste": "varsling",
+            "versjon": "1.22.0",
+            "av": "Jonas Kistesen",
+            "endring": "Oppgradert SmsBud-klient fra 3.1 til 3.2. Ny retry-policy: 5 forsøk med kort pause (før: 3 forsøk med eksponentiell pause).",
+            "kilde_id": "DEPLOY-005",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-23T15:22:00+02:00",
+            "tjeneste": "sok",
+            "versjon": "3.9.0",
+            "av": "Mina Spøkelsesen",
+            "endring": "Ny rangering av treff (mer vekt på lagerstatus).",
+            "kilde_id": "DEPLOY-004",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-22T09:05:00+02:00",
+            "tjeneste": "kunde-db",
+            "versjon": "cron-konfig r41",
+            "av": "Even Gravdal",
+            "endring": "Flyttet ukentlig-vedlikehold fra søndag 04:00 til torsdag 03:30 for å unngå kollisjon med søndagsbackup.",
+            "kilde_id": "DEPLOY-003",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-21T13:40:00+02:00",
+            "tjeneste": "betaling",
+            "versjon": "2.13.2",
+            "av": "Release-tog",
+            "endring": "Oppdatert avhengigheter, ingen funksjonelle endringer.",
+            "kilde_id": "DEPLOY-002",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-20T10:14:00+02:00",
+            "tjeneste": "innlogging",
+            "versjon": "4.8.0",
+            "av": "Hedda Uglevik",
+            "endring": "Passkey som innloggingsmetode for alle brukere.",
+            "kilde_id": "DEPLOY-001",
+            "fil": "data/deploy-historikk.json"
+          }
+        ],
+        "kilder": [
+          "DEPLOY-009",
+          "DEPLOY-008",
+          "DEPLOY-007",
+          "DEPLOY-006",
+          "DEPLOY-005",
+          "DEPLOY-004",
+          "DEPLOY-003",
+          "DEPLOY-002",
+          "DEPLOY-001"
+        ]
+      }
+    },
+    {
+      "type": "runde",
+      "nummer": 2,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 12265,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 446,
+        "output_tokens_details": {
+          "thinking_tokens": 126
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sok_i_logger",
+      "input": {
+        "tjeneste": "kunde-db",
+        "fra": "03:00",
+        "maks": 100
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "filtre": {
+            "tjeneste": "kunde-db",
+            "fra": "03:00",
+            "maks": 100
+          },
+          "total": 28,
+          "returnert": 28,
+          "offset": 0,
+          "maks": 100,
+          "avkortet": false,
+          "neste_offset": null,
+          "første_treff": "2026-10-29T03:00:05+01:00",
+          "siste_treff": "2026-10-29T03:48:05+01:00",
+          "datavindu": {
+            "fra": "2026-10-29T02:30:04+01:00",
+            "til": "2026-10-29T03:48:05+01:00"
+          },
+          "merknad": null
+        },
+        "logger": [
+          {
+            "tid": "2026-10-29T03:00:05+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "INFO",
+            "melding": "checkpoint fullført: skrev 377 buffere",
+            "kilde_id": "LOG-0069",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:02:30+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "INFO",
+            "melding": "arkivering av WAL-segment 0000000100000A3F ok",
+            "kilde_id": "LOG-0076",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:11:20+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "INFO",
+            "melding": "checkpoint fullført: skrev 113 buffere",
+            "kilde_id": "LOG-0099",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:12:35+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "INFO",
+            "melding": "checkpoint fullført: skrev 536 buffere",
+            "kilde_id": "LOG-0106",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:22:20+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "INFO",
+            "melding": "tilkoblinger aktive=60/200",
+            "kilde_id": "LOG-0132",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:23:11+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "INFO",
+            "melding": "tilkoblinger aktive=31/200",
+            "kilde_id": "LOG-0134",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:23:19+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "INFO",
+            "melding": "autovacuum: tabell \"betalinger\" ferdig",
+            "kilde_id": "LOG-0135",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:26:33+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "INFO",
+            "melding": "autovacuum: tabell \"betalinger\" ferdig",
+            "kilde_id": "LOG-0150",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:30:00+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "INFO",
+            "melding": "cron: ukentlig-vedlikehold startet (VACUUM FULL sesjoner, REINDEX sesjoner)",
+            "kilde_id": "LOG-0170",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:30:01+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "INFO",
+            "melding": "VACUUM FULL sesjoner: tar AccessExclusiveLock på relasjon \"sesjoner\" (41 GB)",
+            "kilde_id": "LOG-0171",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:30:55+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "INFO",
+            "melding": "autovacuum: tabell \"betalinger\" ferdig",
+            "kilde_id": "LOG-0173",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:31:05+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "WARN",
+            "melding": "prosess 5385 venter på AccessExclusiveLock på relasjon \"sesjoner\" etter 5000 ms (bruker=innlogging)",
+            "kilde_id": "LOG-0175",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:31:30+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "INFO",
+            "melding": "tilkoblinger aktive=88/200",
+            "kilde_id": "LOG-0178",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:31:50+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "WARN",
+            "melding": "prosess 6749 venter på AccessExclusiveLock på relasjon \"sesjoner\" etter 5000 ms (bruker=innlogging)",
+            "kilde_id": "LOG-0181",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:32:30+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "INFO",
+            "melding": "tilkoblinger aktive=141/200",
+            "kilde_id": "LOG-0185",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:32:40+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "WARN",
+            "melding": "prosess 4258 venter på AccessExclusiveLock på relasjon \"sesjoner\" etter 5000 ms (bruker=innlogging)",
+            "kilde_id": "LOG-0186",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:33:15+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "WARN",
+            "melding": "prosess 3919 venter på AccessExclusiveLock på relasjon \"sesjoner\" etter 5000 ms (bruker=innlogging)",
+            "kilde_id": "LOG-0188",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:33:30+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "WARN",
+            "melding": "tilkoblinger aktive=187/200",
+            "kilde_id": "LOG-0191",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:34:05+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "WARN",
+            "melding": "prosess 9028 venter på AccessExclusiveLock på relasjon \"sesjoner\" etter 5000 ms (bruker=innlogging)",
+            "kilde_id": "LOG-0194",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:34:30+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "WARN",
+            "melding": "tilkoblinger aktive=198/200",
+            "kilde_id": "LOG-0197",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:34:40+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "ERROR",
+            "melding": "FATAL: remaining connection slots are reserved for non-replication superuser connections",
+            "kilde_id": "LOG-0199",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:35:22+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "ERROR",
+            "melding": "FATAL: remaining connection slots are reserved for non-replication superuser connections",
+            "kilde_id": "LOG-0205",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:35:27+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "INFO",
+            "melding": "checkpoint fullført: skrev 622 buffere",
+            "kilde_id": "LOG-0206",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:36:10+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "ERROR",
+            "melding": "FATAL: remaining connection slots are reserved for non-replication superuser connections",
+            "kilde_id": "LOG-0212",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:38:45+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "ERROR",
+            "melding": "FATAL: remaining connection slots are reserved for non-replication superuser connections",
+            "kilde_id": "LOG-0223",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:41:03+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "ERROR",
+            "melding": "FATAL: remaining connection slots are reserved for non-replication superuser connections",
+            "kilde_id": "LOG-0235",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:44:00+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "INFO",
+            "melding": "VACUUM FULL sesjoner: 38% ferdig",
+            "kilde_id": "LOG-0244",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:48:05+01:00",
+            "tjeneste": "kunde-db",
+            "nivå": "INFO",
+            "melding": "checkpoint fullført: skrev 423 buffere",
+            "kilde_id": "LOG-0256",
+            "fil": "data/logger.json"
+          }
+        ],
+        "kilder": [
+          "LOG-0069",
+          "LOG-0076",
+          "LOG-0099",
+          "LOG-0106",
+          "LOG-0132",
+          "LOG-0134",
+          "LOG-0135",
+          "LOG-0150",
+          "LOG-0170",
+          "LOG-0171",
+          "LOG-0173",
+          "LOG-0175",
+          "LOG-0178",
+          "LOG-0181",
+          "LOG-0185",
+          "LOG-0186",
+          "LOG-0188",
+          "LOG-0191",
+          "LOG-0194",
+          "LOG-0197",
+          "LOG-0199",
+          "LOG-0205",
+          "LOG-0206",
+          "LOG-0212",
+          "LOG-0223",
+          "LOG-0235",
+          "LOG-0244",
+          "LOG-0256"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sok_i_logger",
+      "input": {
+        "tjeneste": "innlogging",
+        "fra": "03:00",
+        "maks": 100
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "filtre": {
+            "tjeneste": "innlogging",
+            "fra": "03:00",
+            "maks": 100
+          },
+          "total": 28,
+          "returnert": 28,
+          "offset": 0,
+          "maks": 100,
+          "avkortet": false,
+          "neste_offset": null,
+          "første_treff": "2026-10-29T03:00:01+01:00",
+          "siste_treff": "2026-10-29T03:45:01+01:00",
+          "datavindu": {
+            "fra": "2026-10-29T02:30:04+01:00",
+            "til": "2026-10-29T03:48:05+01:00"
+          },
+          "merknad": null
+        },
+        "logger": [
+          {
+            "tid": "2026-10-29T03:00:01+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "cron: loggrotasjon startet på innlogging-02 (komprimerer /var/log/innlogging)",
+            "kilde_id": "LOG-0068",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:02:09+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "token fornyet bruker=769834",
+            "kilde_id": "LOG-0075",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:03:30+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "disk /var 87% på innlogging-02",
+            "kilde_id": "LOG-0077",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:04:50+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "disk /var 91% på innlogging-02",
+            "kilde_id": "LOG-0082",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:09:12+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "loggrotasjon fullført på innlogging-02: frigjort 11.8 GB, disk /var 54%",
+            "kilde_id": "LOG-0095",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:09:13+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "arkiv lastet opp: innlogging-02-2026-10-28.tar.gz (12.4 GB)",
+            "kilde_id": "LOG-0096",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:10:17+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "token fornyet bruker=345254",
+            "kilde_id": "LOG-0098",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:13:04+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "innlogging ok bruker=190357 metode=passord+sms",
+            "kilde_id": "LOG-0107",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:24:23+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "token fornyet bruker=844522",
+            "kilde_id": "LOG-0142",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:26:43+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "innlogging ok bruker=715841 metode=passord+sms",
+            "kilde_id": "LOG-0152",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:28:00+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "innlogging ok bruker=648332 metode=passkey",
+            "kilde_id": "LOG-0161",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:28:05+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "engangskode-SMS ikke bekreftet levert innen 60s bruker=718220",
+            "kilde_id": "LOG-0164",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:31:20+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 2.4s",
+            "kilde_id": "LOG-0177",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:31:59+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "utlogget bruker=450467",
+            "kilde_id": "LOG-0182",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:32:15+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 5.5s",
+            "kilde_id": "LOG-0184",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:33:05+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 8.6s",
+            "kilde_id": "LOG-0187",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:34:12+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 11.7s",
+            "kilde_id": "LOG-0195",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:35:05+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "ERROR",
+            "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+            "kilde_id": "LOG-0204",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:35:40+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 14.8s",
+            "kilde_id": "LOG-0208",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:36:30+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "ERROR",
+            "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+            "kilde_id": "LOG-0215",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:37:01+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 17.9s",
+            "kilde_id": "LOG-0216",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:37:40+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "engangskode-SMS ikke bekreftet levert innen 60s bruker=302917",
+            "kilde_id": "LOG-0218",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:39:30+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 21.0s",
+            "kilde_id": "LOG-0226",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:40:12+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "ERROR",
+            "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+            "kilde_id": "LOG-0229",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:40:21+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "utlogget bruker=105349",
+            "kilde_id": "LOG-0230",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:42:10+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "innlogging ok bruker=367982 metode=passord+sms",
+            "kilde_id": "LOG-0240",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:42:22+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "token fornyet bruker=281070",
+            "kilde_id": "LOG-0241",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:45:01+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "token fornyet bruker=798850",
+            "kilde_id": "LOG-0247",
+            "fil": "data/logger.json"
+          }
+        ],
+        "kilder": [
+          "LOG-0068",
+          "LOG-0075",
+          "LOG-0077",
+          "LOG-0082",
+          "LOG-0095",
+          "LOG-0096",
+          "LOG-0098",
+          "LOG-0107",
+          "LOG-0142",
+          "LOG-0152",
+          "LOG-0161",
+          "LOG-0164",
+          "LOG-0177",
+          "LOG-0182",
+          "LOG-0184",
+          "LOG-0187",
+          "LOG-0195",
+          "LOG-0204",
+          "LOG-0208",
+          "LOG-0215",
+          "LOG-0216",
+          "LOG-0218",
+          "LOG-0226",
+          "LOG-0229",
+          "LOG-0230",
+          "LOG-0240",
+          "LOG-0241",
+          "LOG-0247"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "hent_runbook",
+      "input": {
+        "tjeneste": "kunde-db"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "merknad": "Runbookens dato må kryssjekkes. En eldre anbefaling kan bygge på et oppsett som ikke lenger finnes."
+        },
+        "runbook": {
+          "kilde_id": "RUNBOOK-kunde-db",
+          "fil": "data/runbooks/kunde-db.md",
+          "tjeneste": "kunde-db",
+          "sist_oppdatert": "2025-11-04",
+          "innhold": "# Runbook: kunde-db\n\nSist oppdatert: 2025-11-04 (Team Grunnmur)\n\n## For mange tilkoblinger / timeout\n\nAlle tjenester kobler til kunde-db via pgbouncer på db-proxy-01.\n\n1. Logg inn på db-proxy-01 og sjekk `SHOW POOLS;` i pgbouncer.\n2. Hvis pgbouncer henger: `systemctl restart pgbouncer`. Det tar ca 10 sekunder og løser det i de fleste tilfeller.\n3. Hvis det ikke hjelper: bytt til lesereplika kunde-db-replika-2 med `dbctl failover replika-2`.\n\n## Ukentlig vedlikehold\n\nKjøres søndag kl 04:00 (VACUUM og REINDEX). Ingen påvirkning på trafikk på den tiden.\n\n## Hvem vekkes\n\nVakt i Team Grunnmur.\n"
+        },
+        "kilder": [
+          "RUNBOOK-kunde-db"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "finn_lignende_hendelser",
+      "input": {
+        "tekst": "tilkobling"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 1,
+          "merknad": "Dato angir hendelsesdag. Tidspunkt for publisering av post-mortem finnes ikke; tilgjengelighet den samme dagen er usikker."
+        },
+        "hendelser": [
+          {
+            "id": "INC-2026-014",
+            "dato": "2026-03-11",
+            "tjeneste": "kunde-db",
+            "alvorlighet": "kritisk",
+            "tittel": "Tilkoblingene brukt opp, innlogging nede",
+            "sammendrag": "pgbouncer på db-proxy-01 gikk tom for minne og sluttet å slippe gjennom tilkoblinger. Innlogging og betaling fikk timeout. Løst ved å restarte pgbouncer.",
+            "rotårsak": "Minnelekkasje i pgbouncer.",
+            "tiltak": "Restart av pgbouncer. Besluttet å fjerne pgbouncer og koble direkte til kunde-db (gjort 12. mars).",
+            "varighet_min": 41,
+            "kilde_id": "INC-2026-014",
+            "fil": "data/hendelser.json"
+          }
+        ],
+        "kilder": [
+          "INC-2026-014"
+        ]
+      }
+    },
+    {
+      "type": "runde",
+      "nummer": 3,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 20409,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 2827,
+        "output_tokens_details": {
+          "thinking_tokens": 51
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "valideringsfeil",
+      "melding": "Ugyldig rapport (rapport.fakta[0].kilde): ukjent felt."
+    },
+    {
+      "type": "runde",
+      "nummer": 4,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 23624,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 2827,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "rapport",
+      "melding": "Rapportformat og kilde-ID-er er kontrollert."
+    }
+  ]
+}

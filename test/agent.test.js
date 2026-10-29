@@ -41,7 +41,7 @@ function scenario(steg, valg = {}) {
   return {
     forespørsler,
     kjør: () => kjørAgent({ system: 'Undersøk alarmen.', oppgave: 'Testalarm', ved,
-      verktøy: [verktøy()], ...valg, konfig, klient }),
+      verktøy: [verktøy()], kontrollerRapport: false, ...valg, konfig, klient }),
   };
 }
 
@@ -379,4 +379,28 @@ test('kildesamling traverserer nøstede resultater og tar en uavhengig kopi', ()
   original.data[0].detaljer.melding = 'Endret etter innhenting.';
   assert.equal(register.get('LOG-1').melding, 'Feil observert');
   assert.equal(register.size, 1);
+});
+
+test('obligatorisk kontrollrunde krever ny rapport og tillater målrettede oppslag', async () => {
+  const s = scenario([svar([les()]), svar([lever('utkast')]), svar([les('motbevis', { tekst: 'eldre feil' })]), svar([lever('endelig')])], { kontrollerRapport: true });
+  const r = await s.kjør();
+  assert.equal(r.status, 'ok');
+  assert.equal(r.iterasjoner, 4);
+  assert.equal(r.spor.filter(e => e.type === 'kontroll').length, 1);
+  const feedback = s.forespørsler[2].input.messages.at(-1).content[0];
+  assert.equal(feedback.tool_use_id, 'utkast');
+  assert.match(feedback.content, /utkast_til_kontroll/);
+  assert.match(feedback.content, /motbevise/);
+  for (const { input } of s.forespørsler) {
+    assert.deepEqual(input.tools, s.forespørsler[0].input.tools);
+    assert.equal(input.system, s.forespørsler[0].input.system);
+  }
+});
+
+test('utkast ved siste runde blir aldri utgitt som kontrollert sluttrapport', async () => {
+  const s = scenario([svar([les()]), svar([lever()])], { kontrollerRapport: true, konfig: { maxIterasjoner: 2 } });
+  const r = await s.kjør();
+  assert.equal(r.status, 'ufullstendig');
+  assert.equal(r.rapport, null);
+  assert.equal(r.spor.filter(e => e.type === 'kontroll').length, 1);
 });

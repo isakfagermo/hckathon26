@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "kontrollrom": "node src/server.js",
     "start": "node src/index.js",
     "demo": "node src/index.js --demo --alle",
     "test": "node --test",

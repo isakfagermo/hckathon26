@@ -1,0 +1,2047 @@
+{
+  "alarmId": "ALARM-0320",
+  "status": "ok",
+  "årsak": null,
+  "rapport": {
+    "tittel": "ALARM-0320: Treg søk (p95 4,6 s) og noen 504 under nattlig fullindeks-reindeks på sok-node-2",
+    "alvorlighet": "høy",
+    "status": "uavklart",
+    "berorte_tjenester": [
+      "sok",
+      "api-gateway"
+    ],
+    "fakta": [
+      {
+        "tekst": "Alarm: p95 4,6 s (terskel 2 s) på sok kl 03:20, noen 504 fra api-gateway.",
+        "kilder": [
+          "ALARM-0320"
+        ]
+      },
+      {
+        "tekst": "Nattlig reindeks startet 03:00 som fullindeks (2,1M dokumenter), ikke inkrementelt. Siste statuslinje 03:18:30: 61 % ferdig. Ingen logglinje om pause eller fullføring.",
+        "kilder": [
+          "LOG-0067",
+          "LOG-0121"
+        ]
+      },
+      {
+        "tekst": "Fra 03:06 steg heap på sok-node-2 fra 86 % til 94 %. GC-pausene økte fra 1,4 s til 3,5 s (03:24). p95 steg i takt fra 2,1 s til 5,1 s.",
+        "kilder": [
+          "LOG-0086",
+          "LOG-0088",
+          "LOG-0100",
+          "LOG-0110",
+          "LOG-0122",
+          "LOG-0128",
+          "LOG-0140",
+          "LOG-0141",
+          "LOG-0089",
+          "LOG-0129"
+        ]
+      },
+      {
+        "tekst": "Gatewayen logget 504 etter 30 s på /api/sok kl 03:22:01 og 03:23:47. Andre /api/sok-kall ga 200 på 41–171 ms i samme periode.",
+        "kilder": [
+          "LOG-0130",
+          "LOG-0139",
+          "LOG-0138",
+          "LOG-0147"
+        ]
+      },
+      {
+        "tekst": "Siste sok-logglinjer (03:26–03:46) viser raske søk på 31–66 ms og ingen nye GC- eller p95-advarsler. Det er enkeltkall og et loggutvalg. Det beviser ikke at p95 er normal eller at reindeksen er stoppet.",
+        "kilder": [
+          "LOG-0154",
+          "LOG-0165",
+          "LOG-0203",
+          "LOG-0227",
+          "LOG-0251"
+        ]
+      },
+      {
+        "tekst": "Samme mønster som INC-2026-031, der en fullindeks på nodene som tar trafikk ga heap over 90 % og 504. Runbooken (oppdatert 2026-06-27) beskriver pause av reindeksen. Katalogen oppgir fortsatt nattlig reindeks 03:00 og tre noder, så runbookens forutsetninger ser ut til å stemme. Ingen nyere sok-deploy endrer reindeks-cron.",
+        "kilder": [
+          "INC-2026-031",
+          "RUNBOOK-sok",
+          "TJENESTE-sok",
+          "DEPLOY-006",
+          "DEPLOY-004"
+        ]
+      }
+    ],
+    "hypoteser": [
+      {
+        "tekst": "Fullindeks-reindeksen på sok-node-2 la for stort minnepress på noden. Det ga lange GC-pauser, høy p95 og 504 for noen søk.",
+        "sikkerhet": "middels",
+        "kilder": [
+          "LOG-0067",
+          "LOG-0086",
+          "LOG-0128",
+          "LOG-0129",
+          "LOG-0130",
+          "INC-2026-031"
+        ],
+        "motbevis": [
+          "Det er ikke logget hvorfor reindeksen startet som fullindeks. Ingen deploy eller konfigendring i sok forklarer det.",
+          "Det er ikke observert at noden gikk tilbake til normal heap eller at reindeksen ble pauset eller ferdig.",
+          "Synonymlisten (DEPLOY-006) og rangeringen (DEPLOY-004) er ikke utelukket som bidrag, men ingen logg peker på dem."
+        ]
+      }
+    ],
+    "usikkerhet": [
+      "Ukjent om reindeksen fortsatt kjører, er pauset eller er ferdig. Siste statuslinje er 03:18:30. Ingen målt p95 etter 03:24 finnes i loggene.",
+      "Årsaken til at jobben ble fullindeks er ukjent. Det kan være cron-konfig eller noe annet.",
+      "Det er ikke målt hvor stor andel av søkene som fikk 504. Bare to 504 på /api/sok er sett i gateway-loggen (03:22 og 03:23).",
+      "Avgrensning: det pågår andre, tilsynelatende uavhengige feil som ikke er analysert her. Det gjelder 500-feil på betaling/trekk, 504 mot innlogging (504-andel 17,2 % kl 03:40) og betaling-deploy 02:51. Disse forklarer ikke sok-alarmen, og jeg har ikke sett bevis for en sammenheng.",
+      "Gateway-ratelimit for én klient på /api/sok (03:17:52) er sett. Det forklarer neppe trege svar, men er ikke utelukket som bidrag."
+    ],
+    "neste_steg": [
+      {
+        "tiltak": "Vakthavende i Team Spåkula (primær Mina Spøkelsesen, sekundær Arne Lyktemann) bør først bekrefte om reindeksen fortsatt kjører. Hvis den gjør det og heap/p95 fortsatt er høy, følger de runbook-steget om å pause reindeksen. Det er et inngripende tiltak som et menneske må utføre. Reindeksen skal ikke startes på nytt i natt.",
+        "ansvarlig": "Team Spåkula, vakthavende",
+        "verifisering": "Kontroller at p95 på sok er under 1 s (runbook-krav) over flere minutter etter pausen, ikke bare ved enkeltkall. Kontroller at GC-pausene og heap på sok-node-2 går ned, og at gatewayen ikke lenger logger 504 mot upstream=sok.",
+        "kilder": [
+          "RUNBOOK-sok",
+          "TJENESTE-sok",
+          "LOG-0121"
+        ]
+      },
+      {
+        "tiltak": "Undersøk hvorfor nattlig-reindeks kjørte som fullindeks i stedet for inkrementelt, og kjør den inkrementelt neste natt slik runbooken sier. Vurder heap på sok-node-2 eller å skille indeksering fra trafikknoder, siden samme årsak ble pekt på i INC-2026-031.",
+        "ansvarlig": "Team Spåkula",
+        "verifisering": "Kontroller at loggen neste natt viser «nattlig-reindeks startet … inkrementell», at heap på sok-node-2 holder seg under 86 % (nivået der første advarsel kom i natt), og at p95 holder seg under 2 s.",
+        "kilder": [
+          "LOG-0067",
+          "INC-2026-031",
+          "RUNBOOK-sok"
+        ]
+      }
+    ],
+    "eskalering": "Vakt i Team Spåkula (primær Mina Spøkelsesen, sekundær Arne Lyktemann). Runbooken sier ingen trenger å vekkes hvis pausen virker, ellers vekkes vakt. Siden status etter 03:24 ikke er verifisert, bør vakten sjekke dette først. Betaling- og innlogging-feilene er separate spor og hører til sine egne eiere."
+  },
+  "ved": "2026-10-29T03:48:05+01:00",
+  "modus": "modell",
+  "modell": "claude-sonnet-5-5",
+  "iterasjoner": 3,
+  "verktoykall": 9,
+  "bruk": {
+    "input_tokens": 36647,
+    "output_tokens": 3424,
+    "cache_read_input_tokens": 0,
+    "cache_creation_input_tokens": 0
+  },
+  "kilder": [
+    {
+      "id": "ALARM-0320",
+      "tid": "2026-10-29T03:20:00+01:00",
+      "tjeneste": "sok",
+      "alvorlighet": "høy",
+      "tittel": "Treg responstid",
+      "tekst": "sok: p95 responstid 4.6 s (terskel 2 s). Noen søk fra api-gateway får 504.",
+      "kilde_id": "ALARM-0320",
+      "fil": "data/alarmer.json"
+    },
+    {
+      "navn": "sok",
+      "beskrivelse": "Produktsøk. Egen søkeklynge med tre noder (sok-node-1, -2, -3). Nattlig reindeks kl 03:00.",
+      "eier_team": "Team Spåkula",
+      "vakt": {
+        "primær": "Mina Spøkelsesen",
+        "sekundær": "Arne Lyktemann"
+      },
+      "avhengigheter": [],
+      "kilde_id": "TJENESTE-sok",
+      "fil": "data/tjenester.json"
+    },
+    {
+      "tid": "2026-10-27T14:10:00+01:00",
+      "tjeneste": "sok",
+      "versjon": "3.9.1",
+      "av": "Mina Spøkelsesen",
+      "endring": "Ny synonymliste for høstkampanjen.",
+      "kilde_id": "DEPLOY-006",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-23T15:22:00+02:00",
+      "tjeneste": "sok",
+      "versjon": "3.9.0",
+      "av": "Mina Spøkelsesen",
+      "endring": "Ny rangering av treff (mer vekt på lagerstatus).",
+      "kilde_id": "DEPLOY-004",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-29T02:51:38+01:00",
+      "tjeneste": "sok",
+      "nivå": "INFO",
+      "melding": "søk q=\"kostyme\" treff=70 tid=57ms",
+      "kilde_id": "LOG-0043",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:56:42+01:00",
+      "tjeneste": "sok",
+      "nivå": "INFO",
+      "melding": "cache-treff 84% siste minutt",
+      "kilde_id": "LOG-0056",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:58:11+01:00",
+      "tjeneste": "sok",
+      "nivå": "WARN",
+      "melding": "synonymliste: ukjent ord \"skjelett\" ignorert",
+      "kilde_id": "LOG-0060",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:58:46+01:00",
+      "tjeneste": "sok",
+      "nivå": "INFO",
+      "melding": "cache-treff 71% siste minutt",
+      "kilde_id": "LOG-0063",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:00:00+01:00",
+      "tjeneste": "sok",
+      "nivå": "INFO",
+      "melding": "cron: nattlig-reindeks startet indeks=produkter-v7 (fullindeks, 2.1M dokumenter)",
+      "kilde_id": "LOG-0067",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:00:32+01:00",
+      "tjeneste": "sok",
+      "nivå": "INFO",
+      "melding": "cache-treff 72% siste minutt",
+      "kilde_id": "LOG-0070",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:06:44+01:00",
+      "tjeneste": "sok",
+      "nivå": "WARN",
+      "melding": "heap 86% på sok-node-2",
+      "kilde_id": "LOG-0086",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:08:10+01:00",
+      "tjeneste": "sok",
+      "nivå": "WARN",
+      "melding": "GC-pause 1.4s på sok-node-2 (heap 88%)",
+      "kilde_id": "LOG-0088",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:08:14+01:00",
+      "tjeneste": "sok",
+      "nivå": "WARN",
+      "melding": "p95 responstid 2.1s siste minutt",
+      "kilde_id": "LOG-0089",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:11:25+01:00",
+      "tjeneste": "sok",
+      "nivå": "WARN",
+      "melding": "GC-pause 1.8s på sok-node-2 (heap 89%)",
+      "kilde_id": "LOG-0100",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:11:29+01:00",
+      "tjeneste": "sok",
+      "nivå": "WARN",
+      "melding": "p95 responstid 2.6s siste minutt",
+      "kilde_id": "LOG-0102",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:12:22+01:00",
+      "tjeneste": "sok",
+      "nivå": "INFO",
+      "melding": "cache-treff 73% siste minutt",
+      "kilde_id": "LOG-0105",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:14:02+01:00",
+      "tjeneste": "sok",
+      "nivå": "WARN",
+      "melding": "GC-pause 2.1s på sok-node-2 (heap 90%)",
+      "kilde_id": "LOG-0110",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:14:06+01:00",
+      "tjeneste": "sok",
+      "nivå": "WARN",
+      "melding": "p95 responstid 3.1s siste minutt",
+      "kilde_id": "LOG-0111",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:16:40+01:00",
+      "tjeneste": "sok",
+      "nivå": "WARN",
+      "melding": "GC-pause 2.4s på sok-node-2 (heap 91%)",
+      "kilde_id": "LOG-0115",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:16:44+01:00",
+      "tjeneste": "sok",
+      "nivå": "WARN",
+      "melding": "p95 responstid 3.6s siste minutt",
+      "kilde_id": "LOG-0116",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:18:30+01:00",
+      "tjeneste": "sok",
+      "nivå": "INFO",
+      "melding": "nattlig-reindeks: 61% ferdig (1.28M av 2.1M)",
+      "kilde_id": "LOG-0121",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:19:05+01:00",
+      "tjeneste": "sok",
+      "nivå": "WARN",
+      "melding": "GC-pause 2.8s på sok-node-2 (heap 92%)",
+      "kilde_id": "LOG-0122",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:19:09+01:00",
+      "tjeneste": "sok",
+      "nivå": "WARN",
+      "melding": "p95 responstid 4.1s siste minutt",
+      "kilde_id": "LOG-0123",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:20:59+01:00",
+      "tjeneste": "sok",
+      "nivå": "INFO",
+      "melding": "cache-treff 75% siste minutt",
+      "kilde_id": "LOG-0127",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:21:30+01:00",
+      "tjeneste": "sok",
+      "nivå": "WARN",
+      "melding": "GC-pause 3.1s på sok-node-2 (heap 93%)",
+      "kilde_id": "LOG-0128",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:21:34+01:00",
+      "tjeneste": "sok",
+      "nivå": "WARN",
+      "melding": "p95 responstid 4.6s siste minutt",
+      "kilde_id": "LOG-0129",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:24:12+01:00",
+      "tjeneste": "sok",
+      "nivå": "WARN",
+      "melding": "GC-pause 3.5s på sok-node-2 (heap 94%)",
+      "kilde_id": "LOG-0140",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:24:16+01:00",
+      "tjeneste": "sok",
+      "nivå": "WARN",
+      "melding": "p95 responstid 5.1s siste minutt",
+      "kilde_id": "LOG-0141",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:26:49+01:00",
+      "tjeneste": "sok",
+      "nivå": "INFO",
+      "melding": "søk q=\"spøkelseslaken\" treff=26 tid=66ms",
+      "kilde_id": "LOG-0154",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:28:34+01:00",
+      "tjeneste": "sok",
+      "nivå": "INFO",
+      "melding": "søk q=\"spøkelseslaken\" treff=307 tid=50ms",
+      "kilde_id": "LOG-0165",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:35:02+01:00",
+      "tjeneste": "sok",
+      "nivå": "INFO",
+      "melding": "søk q=\"heksehatt\" treff=291 tid=65ms",
+      "kilde_id": "LOG-0203",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:35:57+01:00",
+      "tjeneste": "sok",
+      "nivå": "INFO",
+      "melding": "cache-treff 65% siste minutt",
+      "kilde_id": "LOG-0209",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:39:42+01:00",
+      "tjeneste": "sok",
+      "nivå": "INFO",
+      "melding": "søk q=\"lykt\" treff=201 tid=31ms",
+      "kilde_id": "LOG-0227",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:46:23+01:00",
+      "tjeneste": "sok",
+      "nivå": "INFO",
+      "melding": "cache-treff 87% siste minutt",
+      "kilde_id": "LOG-0251",
+      "fil": "data/logger.json"
+    },
+    {
+      "kilde_id": "RUNBOOK-sok",
+      "fil": "data/runbooks/sok.md",
+      "tjeneste": "sok",
+      "sist_oppdatert": "2026-06-27",
+      "innhold": "# Runbook: sok\n\nSist oppdatert: 2026-06-27 (Team Spåkula, etter INC-2026-031)\n\n## Treg responstid om natta\n\nDen nattlige reindeksen starter kl 03:00. Den skal gå inkrementelt. Hvis den starter som fullindeks, blir sok-node-2 presset på minne.\n\nTegn: `nattlig-reindeks startet ... (fullindeks ...)`, deretter GC-pauser og stigende p95.\n\n1. Pause reindeksen: `sokctl reindeks pause produkter-v7`\n2. Vent 2-3 minutter og sjekk at p95 er under 1 s igjen.\n3. Ikke start den på nytt i natt. Legg en lapp til Team Spåkula, de kjører den inkrementelt neste natt.\n\n## Hvem vekkes\n\nIngen trenger å vekkes hvis pausen virker. Ellers vakt i Team Spåkula.\n"
+    },
+    {
+      "tid": "2026-10-29T03:01:50+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "GET /api/varsler 200 54ms",
+      "kilde_id": "LOG-0072",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:01:54+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+      "kilde_id": "LOG-0074",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:04:12+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+      "kilde_id": "LOG-0079",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:04:14+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "GET /api/sok 200 70ms",
+      "kilde_id": "LOG-0080",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:05:17+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "GET /api/konto/meg 200 167ms",
+      "kilde_id": "LOG-0084",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:08:22+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "GET /api/konto/meg 200 163ms",
+      "kilde_id": "LOG-0091",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:08:49+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "GET /api/konto/meg 200 34ms",
+      "kilde_id": "LOG-0093",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:17:07+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "POST /api/varsler 200 93ms",
+      "kilde_id": "LOG-0117",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:17:52+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "klient 10.4.7.22 rate-limited (120 kall/min) rute=/api/sok",
+      "kilde_id": "LOG-0118",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:17:57+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "GET /api/konto/meg 200 99ms",
+      "kilde_id": "LOG-0119",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:20:47+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+      "kilde_id": "LOG-0126",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:22:01+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "GET /api/sok 504 30000ms upstream=sok",
+      "kilde_id": "LOG-0130",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:23:42+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "GET /api/sok 200 171ms",
+      "kilde_id": "LOG-0138",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:23:47+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "GET /api/sok 504 30000ms upstream=sok",
+      "kilde_id": "LOG-0139",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:25:10+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+      "kilde_id": "LOG-0145",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:25:46+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "GET /api/sok 200 147ms",
+      "kilde_id": "LOG-0147",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:25:47+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "GET /api/konto/meg 200 186ms",
+      "kilde_id": "LOG-0148",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:26:45+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "POST /api/varsler 200 82ms",
+      "kilde_id": "LOG-0153",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:27:09+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+      "kilde_id": "LOG-0158",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:27:15+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "POST /api/sok 200 43ms",
+      "kilde_id": "LOG-0159",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:27:37+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "GET /api/varsler 200 104ms",
+      "kilde_id": "LOG-0160",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:28:01+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "GET /api/sok 200 41ms",
+      "kilde_id": "LOG-0162",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:31:41+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+      "kilde_id": "LOG-0180",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:32:04+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "GET /api/sok 200 45ms",
+      "kilde_id": "LOG-0183",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:33:29+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+      "kilde_id": "LOG-0190",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:33:50+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "GET /api/konto/meg 504 30000ms upstream=innlogging",
+      "kilde_id": "LOG-0193",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:34:44+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "GET /api/konto/meg 504 30000ms upstream=innlogging",
+      "kilde_id": "LOG-0200",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:34:52+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "GET /api/sok 200 44ms",
+      "kilde_id": "LOG-0201",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:35:31+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "POST /api/innlogging 504 30000ms upstream=innlogging",
+      "kilde_id": "LOG-0207",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:36:00+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "konfig lastet: timeouts.yaml (versjon fra 2026-10-28 14:02)",
+      "kilde_id": "LOG-0210",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:36:20+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "GET /api/konto/meg 504 30000ms upstream=innlogging",
+      "kilde_id": "LOG-0214",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:37:15+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "POST /api/innlogging 504 30000ms upstream=innlogging",
+      "kilde_id": "LOG-0217",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:38:02+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "GET /api/konto/meg 504 30000ms upstream=innlogging",
+      "kilde_id": "LOG-0220",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:38:25+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "GET /api/betaling/status 200 68ms",
+      "kilde_id": "LOG-0221",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:39:11+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "GET /api/konto/meg 504 30000ms upstream=innlogging",
+      "kilde_id": "LOG-0224",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:40:00+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "ERROR",
+      "melding": "504-andel siste 5 min: 17.2% (terskel 5%), mest upstream=innlogging",
+      "kilde_id": "LOG-0228",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:40:40+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "GET /api/konto/meg 504 30000ms upstream=innlogging",
+      "kilde_id": "LOG-0231",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:40:43+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+      "kilde_id": "LOG-0233",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:41:37+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "POST /api/betaling/status 200 168ms",
+      "kilde_id": "LOG-0236",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:41:44+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "GET /api/konto/meg 200 57ms",
+      "kilde_id": "LOG-0237",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:42:05+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "GET /api/konto/meg 504 30000ms upstream=innlogging",
+      "kilde_id": "LOG-0239",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:44:30+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "GET /api/konto/meg 504 30000ms upstream=innlogging",
+      "kilde_id": "LOG-0245",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:45:23+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+      "kilde_id": "LOG-0250",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:46:24+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "POST /api/konto/meg 200 184ms",
+      "kilde_id": "LOG-0252",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:46:49+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "INFO",
+      "melding": "GET /api/sok 200 174ms",
+      "kilde_id": "LOG-0253",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:47:42+01:00",
+      "tjeneste": "api-gateway",
+      "nivå": "WARN",
+      "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+      "kilde_id": "LOG-0255",
+      "fil": "data/logger.json"
+    },
+    {
+      "id": "INC-2026-031",
+      "dato": "2026-06-25",
+      "tjeneste": "sok",
+      "alvorlighet": "høy",
+      "tittel": "Treg søk under nattlig reindeks",
+      "sammendrag": "nattlig-reindeks startet kl 03:00 som fullindeks i stedet for inkrementell. Heap på sok-node-2 over 90 %, lange GC-pauser, p95 opp mot 5 s og enkelte 504 fra gatewayen fra ca 03:08.",
+      "rotårsak": "Fullindeks kjørt på samme noder som tar trafikk. sok-node-2 har for lite heap til begge deler.",
+      "tiltak": "Pauset reindeksen (se runbook sok.md). Responstiden normal etter 3 min. Reindeks fullført neste natt i inkrementell modus.",
+      "varighet_min": 22,
+      "kilde_id": "INC-2026-031",
+      "fil": "data/hendelser.json"
+    },
+    {
+      "tid": "2026-10-29T02:51:12+01:00",
+      "tjeneste": "betaling",
+      "versjon": "2.14.0",
+      "av": "Release-tog natt-1029",
+      "endring": "Ny gebyrberegning for utenlandske kort. Valuta hentes nå fra kortinfo-objektet i stedet for fra transaksjonen.",
+      "kilde_id": "DEPLOY-009",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-28T14:02:00+01:00",
+      "tjeneste": "api-gateway",
+      "versjon": "konfig timeouts.yaml r17",
+      "av": "Trond Benrangel",
+      "endring": "Økt timeout for /api/rapport fra 30 s til 60 s. Andre ruter uendret (30 s).",
+      "kilde_id": "DEPLOY-008",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-28T09:45:00+01:00",
+      "tjeneste": "innlogging",
+      "versjon": "4.8.1",
+      "av": "Hedda Uglevik",
+      "endring": "Retter tekst i feilmelding ved utløpt engangskode.",
+      "kilde_id": "DEPLOY-007",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-26T11:30:00+01:00",
+      "tjeneste": "varsling",
+      "versjon": "1.22.0",
+      "av": "Jonas Kistesen",
+      "endring": "Oppgradert SmsBud-klient fra 3.1 til 3.2. Ny retry-policy: 5 forsøk med kort pause (før: 3 forsøk med eksponentiell pause).",
+      "kilde_id": "DEPLOY-005",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-22T09:05:00+02:00",
+      "tjeneste": "kunde-db",
+      "versjon": "cron-konfig r41",
+      "av": "Even Gravdal",
+      "endring": "Flyttet ukentlig-vedlikehold fra søndag 04:00 til torsdag 03:30 for å unngå kollisjon med søndagsbackup.",
+      "kilde_id": "DEPLOY-003",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-21T13:40:00+02:00",
+      "tjeneste": "betaling",
+      "versjon": "2.13.2",
+      "av": "Release-tog",
+      "endring": "Oppdatert avhengigheter, ingen funksjonelle endringer.",
+      "kilde_id": "DEPLOY-002",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-20T10:14:00+02:00",
+      "tjeneste": "innlogging",
+      "versjon": "4.8.0",
+      "av": "Hedda Uglevik",
+      "endring": "Passkey som innloggingsmetode for alle brukere.",
+      "kilde_id": "DEPLOY-001",
+      "fil": "data/deploy-historikk.json"
+    }
+  ],
+  "spor": [
+    {
+      "type": "runde",
+      "nummer": 1,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 6085,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 348,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "hent_alarmer",
+      "input": {
+        "id": "ALARM-0320"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 1
+        },
+        "alarmer": [
+          {
+            "id": "ALARM-0320",
+            "tid": "2026-10-29T03:20:00+01:00",
+            "tjeneste": "sok",
+            "alvorlighet": "høy",
+            "tittel": "Treg responstid",
+            "tekst": "sok: p95 responstid 4.6 s (terskel 2 s). Noen søk fra api-gateway får 504.",
+            "kilde_id": "ALARM-0320",
+            "fil": "data/alarmer.json"
+          }
+        ],
+        "kilder": [
+          "ALARM-0320"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "hent_tjenesteinfo",
+      "input": {
+        "tjeneste": "sok"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 1,
+          "merknad": "Tjenestekatalogen er udatert. Historisk korrekthet ved eldre observasjonstid kan ikke bekreftes."
+        },
+        "tjenester": [
+          {
+            "navn": "sok",
+            "beskrivelse": "Produktsøk. Egen søkeklynge med tre noder (sok-node-1, -2, -3). Nattlig reindeks kl 03:00.",
+            "eier_team": "Team Spåkula",
+            "vakt": {
+              "primær": "Mina Spøkelsesen",
+              "sekundær": "Arne Lyktemann"
+            },
+            "avhengigheter": [],
+            "kilde_id": "TJENESTE-sok",
+            "fil": "data/tjenester.json"
+          }
+        ],
+        "kilder": [
+          "TJENESTE-sok"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sjekk_deploy_historikk",
+      "input": {
+        "tjeneste": "sok"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 2
+        },
+        "deployer": [
+          {
+            "tid": "2026-10-27T14:10:00+01:00",
+            "tjeneste": "sok",
+            "versjon": "3.9.1",
+            "av": "Mina Spøkelsesen",
+            "endring": "Ny synonymliste for høstkampanjen.",
+            "kilde_id": "DEPLOY-006",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-23T15:22:00+02:00",
+            "tjeneste": "sok",
+            "versjon": "3.9.0",
+            "av": "Mina Spøkelsesen",
+            "endring": "Ny rangering av treff (mer vekt på lagerstatus).",
+            "kilde_id": "DEPLOY-004",
+            "fil": "data/deploy-historikk.json"
+          }
+        ],
+        "kilder": [
+          "DEPLOY-006",
+          "DEPLOY-004"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sok_i_logger",
+      "input": {
+        "tjeneste": "sok",
+        "fra": "02:50",
+        "til": "03:48:05",
+        "maks": 100
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "filtre": {
+            "tjeneste": "sok",
+            "fra": "02:50",
+            "til": "03:48:05",
+            "maks": 100
+          },
+          "total": 30,
+          "returnert": 30,
+          "offset": 0,
+          "maks": 100,
+          "avkortet": false,
+          "neste_offset": null,
+          "første_treff": "2026-10-29T02:51:38+01:00",
+          "siste_treff": "2026-10-29T03:46:23+01:00",
+          "datavindu": {
+            "fra": "2026-10-29T02:30:04+01:00",
+            "til": "2026-10-29T03:48:05+01:00"
+          },
+          "merknad": null
+        },
+        "logger": [
+          {
+            "tid": "2026-10-29T02:51:38+01:00",
+            "tjeneste": "sok",
+            "nivå": "INFO",
+            "melding": "søk q=\"kostyme\" treff=70 tid=57ms",
+            "kilde_id": "LOG-0043",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:56:42+01:00",
+            "tjeneste": "sok",
+            "nivå": "INFO",
+            "melding": "cache-treff 84% siste minutt",
+            "kilde_id": "LOG-0056",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:58:11+01:00",
+            "tjeneste": "sok",
+            "nivå": "WARN",
+            "melding": "synonymliste: ukjent ord \"skjelett\" ignorert",
+            "kilde_id": "LOG-0060",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:58:46+01:00",
+            "tjeneste": "sok",
+            "nivå": "INFO",
+            "melding": "cache-treff 71% siste minutt",
+            "kilde_id": "LOG-0063",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:00:00+01:00",
+            "tjeneste": "sok",
+            "nivå": "INFO",
+            "melding": "cron: nattlig-reindeks startet indeks=produkter-v7 (fullindeks, 2.1M dokumenter)",
+            "kilde_id": "LOG-0067",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:00:32+01:00",
+            "tjeneste": "sok",
+            "nivå": "INFO",
+            "melding": "cache-treff 72% siste minutt",
+            "kilde_id": "LOG-0070",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:06:44+01:00",
+            "tjeneste": "sok",
+            "nivå": "WARN",
+            "melding": "heap 86% på sok-node-2",
+            "kilde_id": "LOG-0086",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:08:10+01:00",
+            "tjeneste": "sok",
+            "nivå": "WARN",
+            "melding": "GC-pause 1.4s på sok-node-2 (heap 88%)",
+            "kilde_id": "LOG-0088",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:08:14+01:00",
+            "tjeneste": "sok",
+            "nivå": "WARN",
+            "melding": "p95 responstid 2.1s siste minutt",
+            "kilde_id": "LOG-0089",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:11:25+01:00",
+            "tjeneste": "sok",
+            "nivå": "WARN",
+            "melding": "GC-pause 1.8s på sok-node-2 (heap 89%)",
+            "kilde_id": "LOG-0100",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:11:29+01:00",
+            "tjeneste": "sok",
+            "nivå": "WARN",
+            "melding": "p95 responstid 2.6s siste minutt",
+            "kilde_id": "LOG-0102",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:12:22+01:00",
+            "tjeneste": "sok",
+            "nivå": "INFO",
+            "melding": "cache-treff 73% siste minutt",
+            "kilde_id": "LOG-0105",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:14:02+01:00",
+            "tjeneste": "sok",
+            "nivå": "WARN",
+            "melding": "GC-pause 2.1s på sok-node-2 (heap 90%)",
+            "kilde_id": "LOG-0110",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:14:06+01:00",
+            "tjeneste": "sok",
+            "nivå": "WARN",
+            "melding": "p95 responstid 3.1s siste minutt",
+            "kilde_id": "LOG-0111",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:16:40+01:00",
+            "tjeneste": "sok",
+            "nivå": "WARN",
+            "melding": "GC-pause 2.4s på sok-node-2 (heap 91%)",
+            "kilde_id": "LOG-0115",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:16:44+01:00",
+            "tjeneste": "sok",
+            "nivå": "WARN",
+            "melding": "p95 responstid 3.6s siste minutt",
+            "kilde_id": "LOG-0116",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:18:30+01:00",
+            "tjeneste": "sok",
+            "nivå": "INFO",
+            "melding": "nattlig-reindeks: 61% ferdig (1.28M av 2.1M)",
+            "kilde_id": "LOG-0121",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:19:05+01:00",
+            "tjeneste": "sok",
+            "nivå": "WARN",
+            "melding": "GC-pause 2.8s på sok-node-2 (heap 92%)",
+            "kilde_id": "LOG-0122",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:19:09+01:00",
+            "tjeneste": "sok",
+            "nivå": "WARN",
+            "melding": "p95 responstid 4.1s siste minutt",
+            "kilde_id": "LOG-0123",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:20:59+01:00",
+            "tjeneste": "sok",
+            "nivå": "INFO",
+            "melding": "cache-treff 75% siste minutt",
+            "kilde_id": "LOG-0127",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:21:30+01:00",
+            "tjeneste": "sok",
+            "nivå": "WARN",
+            "melding": "GC-pause 3.1s på sok-node-2 (heap 93%)",
+            "kilde_id": "LOG-0128",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:21:34+01:00",
+            "tjeneste": "sok",
+            "nivå": "WARN",
+            "melding": "p95 responstid 4.6s siste minutt",
+            "kilde_id": "LOG-0129",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:24:12+01:00",
+            "tjeneste": "sok",
+            "nivå": "WARN",
+            "melding": "GC-pause 3.5s på sok-node-2 (heap 94%)",
+            "kilde_id": "LOG-0140",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:24:16+01:00",
+            "tjeneste": "sok",
+            "nivå": "WARN",
+            "melding": "p95 responstid 5.1s siste minutt",
+            "kilde_id": "LOG-0141",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:26:49+01:00",
+            "tjeneste": "sok",
+            "nivå": "INFO",
+            "melding": "søk q=\"spøkelseslaken\" treff=26 tid=66ms",
+            "kilde_id": "LOG-0154",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:28:34+01:00",
+            "tjeneste": "sok",
+            "nivå": "INFO",
+            "melding": "søk q=\"spøkelseslaken\" treff=307 tid=50ms",
+            "kilde_id": "LOG-0165",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:35:02+01:00",
+            "tjeneste": "sok",
+            "nivå": "INFO",
+            "melding": "søk q=\"heksehatt\" treff=291 tid=65ms",
+            "kilde_id": "LOG-0203",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:35:57+01:00",
+            "tjeneste": "sok",
+            "nivå": "INFO",
+            "melding": "cache-treff 65% siste minutt",
+            "kilde_id": "LOG-0209",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:39:42+01:00",
+            "tjeneste": "sok",
+            "nivå": "INFO",
+            "melding": "søk q=\"lykt\" treff=201 tid=31ms",
+            "kilde_id": "LOG-0227",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:46:23+01:00",
+            "tjeneste": "sok",
+            "nivå": "INFO",
+            "melding": "cache-treff 87% siste minutt",
+            "kilde_id": "LOG-0251",
+            "fil": "data/logger.json"
+          }
+        ],
+        "kilder": [
+          "LOG-0043",
+          "LOG-0056",
+          "LOG-0060",
+          "LOG-0063",
+          "LOG-0067",
+          "LOG-0070",
+          "LOG-0086",
+          "LOG-0088",
+          "LOG-0089",
+          "LOG-0100",
+          "LOG-0102",
+          "LOG-0105",
+          "LOG-0110",
+          "LOG-0111",
+          "LOG-0115",
+          "LOG-0116",
+          "LOG-0121",
+          "LOG-0122",
+          "LOG-0123",
+          "LOG-0127",
+          "LOG-0128",
+          "LOG-0129",
+          "LOG-0140",
+          "LOG-0141",
+          "LOG-0154",
+          "LOG-0165",
+          "LOG-0203",
+          "LOG-0209",
+          "LOG-0227",
+          "LOG-0251"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "hent_runbook",
+      "input": {
+        "tjeneste": "sok"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "merknad": "Runbookens dato må kryssjekkes. En eldre anbefaling kan bygge på et oppsett som ikke lenger finnes."
+        },
+        "runbook": {
+          "kilde_id": "RUNBOOK-sok",
+          "fil": "data/runbooks/sok.md",
+          "tjeneste": "sok",
+          "sist_oppdatert": "2026-06-27",
+          "innhold": "# Runbook: sok\n\nSist oppdatert: 2026-06-27 (Team Spåkula, etter INC-2026-031)\n\n## Treg responstid om natta\n\nDen nattlige reindeksen starter kl 03:00. Den skal gå inkrementelt. Hvis den starter som fullindeks, blir sok-node-2 presset på minne.\n\nTegn: `nattlig-reindeks startet ... (fullindeks ...)`, deretter GC-pauser og stigende p95.\n\n1. Pause reindeksen: `sokctl reindeks pause produkter-v7`\n2. Vent 2-3 minutter og sjekk at p95 er under 1 s igjen.\n3. Ikke start den på nytt i natt. Legg en lapp til Team Spåkula, de kjører den inkrementelt neste natt.\n\n## Hvem vekkes\n\nIngen trenger å vekkes hvis pausen virker. Ellers vakt i Team Spåkula.\n"
+        },
+        "kilder": [
+          "RUNBOOK-sok"
+        ]
+      }
+    },
+    {
+      "type": "runde",
+      "nummer": 2,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 11316,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 446,
+        "output_tokens_details": {
+          "thinking_tokens": 143
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sok_i_logger",
+      "input": {
+        "tjeneste": "sok",
+        "tekst": "reindeks"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "filtre": {
+            "tjeneste": "sok",
+            "tekst": "reindeks"
+          },
+          "total": 2,
+          "returnert": 2,
+          "offset": 0,
+          "maks": 50,
+          "avkortet": false,
+          "neste_offset": null,
+          "første_treff": "2026-10-29T03:00:00+01:00",
+          "siste_treff": "2026-10-29T03:18:30+01:00",
+          "datavindu": {
+            "fra": "2026-10-29T02:30:04+01:00",
+            "til": "2026-10-29T03:48:05+01:00"
+          },
+          "merknad": null
+        },
+        "logger": [
+          {
+            "tid": "2026-10-29T03:00:00+01:00",
+            "tjeneste": "sok",
+            "nivå": "INFO",
+            "melding": "cron: nattlig-reindeks startet indeks=produkter-v7 (fullindeks, 2.1M dokumenter)",
+            "kilde_id": "LOG-0067",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:18:30+01:00",
+            "tjeneste": "sok",
+            "nivå": "INFO",
+            "melding": "nattlig-reindeks: 61% ferdig (1.28M av 2.1M)",
+            "kilde_id": "LOG-0121",
+            "fil": "data/logger.json"
+          }
+        ],
+        "kilder": [
+          "LOG-0067",
+          "LOG-0121"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sok_i_logger",
+      "input": {
+        "tjeneste": "api-gateway",
+        "fra": "03:00",
+        "til": "03:48:05"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "filtre": {
+            "tjeneste": "api-gateway",
+            "fra": "03:00",
+            "til": "03:48:05"
+          },
+          "total": 46,
+          "returnert": 46,
+          "offset": 0,
+          "maks": 50,
+          "avkortet": false,
+          "neste_offset": null,
+          "første_treff": "2026-10-29T03:01:50+01:00",
+          "siste_treff": "2026-10-29T03:47:42+01:00",
+          "datavindu": {
+            "fra": "2026-10-29T02:30:04+01:00",
+            "til": "2026-10-29T03:48:05+01:00"
+          },
+          "merknad": null
+        },
+        "logger": [
+          {
+            "tid": "2026-10-29T03:01:50+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "GET /api/varsler 200 54ms",
+            "kilde_id": "LOG-0072",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:01:54+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+            "kilde_id": "LOG-0074",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:04:12+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+            "kilde_id": "LOG-0079",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:04:14+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "GET /api/sok 200 70ms",
+            "kilde_id": "LOG-0080",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:05:17+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "GET /api/konto/meg 200 167ms",
+            "kilde_id": "LOG-0084",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:08:22+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "GET /api/konto/meg 200 163ms",
+            "kilde_id": "LOG-0091",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:08:49+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "GET /api/konto/meg 200 34ms",
+            "kilde_id": "LOG-0093",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:17:07+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "POST /api/varsler 200 93ms",
+            "kilde_id": "LOG-0117",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:17:52+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "klient 10.4.7.22 rate-limited (120 kall/min) rute=/api/sok",
+            "kilde_id": "LOG-0118",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:17:57+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "GET /api/konto/meg 200 99ms",
+            "kilde_id": "LOG-0119",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:20:47+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+            "kilde_id": "LOG-0126",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:22:01+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "GET /api/sok 504 30000ms upstream=sok",
+            "kilde_id": "LOG-0130",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:23:42+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "GET /api/sok 200 171ms",
+            "kilde_id": "LOG-0138",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:23:47+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "GET /api/sok 504 30000ms upstream=sok",
+            "kilde_id": "LOG-0139",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:25:10+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+            "kilde_id": "LOG-0145",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:25:46+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "GET /api/sok 200 147ms",
+            "kilde_id": "LOG-0147",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:25:47+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "GET /api/konto/meg 200 186ms",
+            "kilde_id": "LOG-0148",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:26:45+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "POST /api/varsler 200 82ms",
+            "kilde_id": "LOG-0153",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:27:09+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+            "kilde_id": "LOG-0158",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:27:15+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "POST /api/sok 200 43ms",
+            "kilde_id": "LOG-0159",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:27:37+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "GET /api/varsler 200 104ms",
+            "kilde_id": "LOG-0160",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:28:01+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "GET /api/sok 200 41ms",
+            "kilde_id": "LOG-0162",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:31:41+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+            "kilde_id": "LOG-0180",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:32:04+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "GET /api/sok 200 45ms",
+            "kilde_id": "LOG-0183",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:33:29+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+            "kilde_id": "LOG-0190",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:33:50+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "GET /api/konto/meg 504 30000ms upstream=innlogging",
+            "kilde_id": "LOG-0193",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:34:44+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "GET /api/konto/meg 504 30000ms upstream=innlogging",
+            "kilde_id": "LOG-0200",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:34:52+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "GET /api/sok 200 44ms",
+            "kilde_id": "LOG-0201",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:35:31+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "POST /api/innlogging 504 30000ms upstream=innlogging",
+            "kilde_id": "LOG-0207",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:36:00+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "konfig lastet: timeouts.yaml (versjon fra 2026-10-28 14:02)",
+            "kilde_id": "LOG-0210",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:36:20+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "GET /api/konto/meg 504 30000ms upstream=innlogging",
+            "kilde_id": "LOG-0214",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:37:15+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "POST /api/innlogging 504 30000ms upstream=innlogging",
+            "kilde_id": "LOG-0217",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:38:02+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "GET /api/konto/meg 504 30000ms upstream=innlogging",
+            "kilde_id": "LOG-0220",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:38:25+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "GET /api/betaling/status 200 68ms",
+            "kilde_id": "LOG-0221",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:39:11+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "GET /api/konto/meg 504 30000ms upstream=innlogging",
+            "kilde_id": "LOG-0224",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:40:00+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "ERROR",
+            "melding": "504-andel siste 5 min: 17.2% (terskel 5%), mest upstream=innlogging",
+            "kilde_id": "LOG-0228",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:40:40+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "GET /api/konto/meg 504 30000ms upstream=innlogging",
+            "kilde_id": "LOG-0231",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:40:43+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+            "kilde_id": "LOG-0233",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:41:37+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "POST /api/betaling/status 200 168ms",
+            "kilde_id": "LOG-0236",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:41:44+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "GET /api/konto/meg 200 57ms",
+            "kilde_id": "LOG-0237",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:42:05+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "GET /api/konto/meg 504 30000ms upstream=innlogging",
+            "kilde_id": "LOG-0239",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:44:30+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "GET /api/konto/meg 504 30000ms upstream=innlogging",
+            "kilde_id": "LOG-0245",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:45:23+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+            "kilde_id": "LOG-0250",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:46:24+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "POST /api/konto/meg 200 184ms",
+            "kilde_id": "LOG-0252",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:46:49+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "INFO",
+            "melding": "GET /api/sok 200 174ms",
+            "kilde_id": "LOG-0253",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:47:42+01:00",
+            "tjeneste": "api-gateway",
+            "nivå": "WARN",
+            "melding": "POST /api/betaling/trekk 500 41ms upstream=betaling",
+            "kilde_id": "LOG-0255",
+            "fil": "data/logger.json"
+          }
+        ],
+        "kilder": [
+          "LOG-0072",
+          "LOG-0074",
+          "LOG-0079",
+          "LOG-0080",
+          "LOG-0084",
+          "LOG-0091",
+          "LOG-0093",
+          "LOG-0117",
+          "LOG-0118",
+          "LOG-0119",
+          "LOG-0126",
+          "LOG-0130",
+          "LOG-0138",
+          "LOG-0139",
+          "LOG-0145",
+          "LOG-0147",
+          "LOG-0148",
+          "LOG-0153",
+          "LOG-0158",
+          "LOG-0159",
+          "LOG-0160",
+          "LOG-0162",
+          "LOG-0180",
+          "LOG-0183",
+          "LOG-0190",
+          "LOG-0193",
+          "LOG-0200",
+          "LOG-0201",
+          "LOG-0207",
+          "LOG-0210",
+          "LOG-0214",
+          "LOG-0217",
+          "LOG-0220",
+          "LOG-0221",
+          "LOG-0224",
+          "LOG-0228",
+          "LOG-0231",
+          "LOG-0233",
+          "LOG-0236",
+          "LOG-0237",
+          "LOG-0239",
+          "LOG-0245",
+          "LOG-0250",
+          "LOG-0252",
+          "LOG-0253",
+          "LOG-0255"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "finn_lignende_hendelser",
+      "input": {
+        "tjeneste": "sok",
+        "tekst": "reindeks"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 1,
+          "merknad": "Dato angir hendelsesdag. Tidspunkt for publisering av post-mortem finnes ikke; tilgjengelighet den samme dagen er usikker."
+        },
+        "hendelser": [
+          {
+            "id": "INC-2026-031",
+            "dato": "2026-06-25",
+            "tjeneste": "sok",
+            "alvorlighet": "høy",
+            "tittel": "Treg søk under nattlig reindeks",
+            "sammendrag": "nattlig-reindeks startet kl 03:00 som fullindeks i stedet for inkrementell. Heap på sok-node-2 over 90 %, lange GC-pauser, p95 opp mot 5 s og enkelte 504 fra gatewayen fra ca 03:08.",
+            "rotårsak": "Fullindeks kjørt på samme noder som tar trafikk. sok-node-2 har for lite heap til begge deler.",
+            "tiltak": "Pauset reindeksen (se runbook sok.md). Responstiden normal etter 3 min. Reindeks fullført neste natt i inkrementell modus.",
+            "varighet_min": 22,
+            "kilde_id": "INC-2026-031",
+            "fil": "data/hendelser.json"
+          }
+        ],
+        "kilder": [
+          "INC-2026-031"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sjekk_deploy_historikk",
+      "input": {},
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 9
+        },
+        "deployer": [
+          {
+            "tid": "2026-10-29T02:51:12+01:00",
+            "tjeneste": "betaling",
+            "versjon": "2.14.0",
+            "av": "Release-tog natt-1029",
+            "endring": "Ny gebyrberegning for utenlandske kort. Valuta hentes nå fra kortinfo-objektet i stedet for fra transaksjonen.",
+            "kilde_id": "DEPLOY-009",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-28T14:02:00+01:00",
+            "tjeneste": "api-gateway",
+            "versjon": "konfig timeouts.yaml r17",
+            "av": "Trond Benrangel",
+            "endring": "Økt timeout for /api/rapport fra 30 s til 60 s. Andre ruter uendret (30 s).",
+            "kilde_id": "DEPLOY-008",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-28T09:45:00+01:00",
+            "tjeneste": "innlogging",
+            "versjon": "4.8.1",
+            "av": "Hedda Uglevik",
+            "endring": "Retter tekst i feilmelding ved utløpt engangskode.",
+            "kilde_id": "DEPLOY-007",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-27T14:10:00+01:00",
+            "tjeneste": "sok",
+            "versjon": "3.9.1",
+            "av": "Mina Spøkelsesen",
+            "endring": "Ny synonymliste for høstkampanjen.",
+            "kilde_id": "DEPLOY-006",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-26T11:30:00+01:00",
+            "tjeneste": "varsling",
+            "versjon": "1.22.0",
+            "av": "Jonas Kistesen",
+            "endring": "Oppgradert SmsBud-klient fra 3.1 til 3.2. Ny retry-policy: 5 forsøk med kort pause (før: 3 forsøk med eksponentiell pause).",
+            "kilde_id": "DEPLOY-005",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-23T15:22:00+02:00",
+            "tjeneste": "sok",
+            "versjon": "3.9.0",
+            "av": "Mina Spøkelsesen",
+            "endring": "Ny rangering av treff (mer vekt på lagerstatus).",
+            "kilde_id": "DEPLOY-004",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-22T09:05:00+02:00",
+            "tjeneste": "kunde-db",
+            "versjon": "cron-konfig r41",
+            "av": "Even Gravdal",
+            "endring": "Flyttet ukentlig-vedlikehold fra søndag 04:00 til torsdag 03:30 for å unngå kollisjon med søndagsbackup.",
+            "kilde_id": "DEPLOY-003",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-21T13:40:00+02:00",
+            "tjeneste": "betaling",
+            "versjon": "2.13.2",
+            "av": "Release-tog",
+            "endring": "Oppdatert avhengigheter, ingen funksjonelle endringer.",
+            "kilde_id": "DEPLOY-002",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-20T10:14:00+02:00",
+            "tjeneste": "innlogging",
+            "versjon": "4.8.0",
+            "av": "Hedda Uglevik",
+            "endring": "Passkey som innloggingsmetode for alle brukere.",
+            "kilde_id": "DEPLOY-001",
+            "fil": "data/deploy-historikk.json"
+          }
+        ],
+        "kilder": [
+          "DEPLOY-009",
+          "DEPLOY-008",
+          "DEPLOY-007",
+          "DEPLOY-006",
+          "DEPLOY-005",
+          "DEPLOY-004",
+          "DEPLOY-003",
+          "DEPLOY-002",
+          "DEPLOY-001"
+        ]
+      }
+    },
+    {
+      "type": "runde",
+      "nummer": 3,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 19246,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 2630,
+        "output_tokens_details": {
+          "thinking_tokens": 70
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "rapport",
+      "melding": "Rapportformat og kilde-ID-er er kontrollert."
+    }
+  ]
+}

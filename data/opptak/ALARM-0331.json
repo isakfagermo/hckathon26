@@ -1,0 +1,1381 @@
+{
+  "alarmId": "ALARM-0331",
+  "status": "ok",
+  "årsak": null,
+  "rapport": {
+    "tittel": "ALARM-0331: Lav SMS-leveringsrate (58 %) i varsling mot SmsBud, voksende kø",
+    "alvorlighet": "høy",
+    "status": "uavklart",
+    "berorte_tjenester": [
+      "varsling",
+      "innlogging (engangskoder via SMS, delvis)"
+    ],
+    "fakta": [
+      {
+        "tekst": "ALARM-0331 gikk 03:31: 58 % levert siste 10 min (terskel 90 %), kø sms-utgående vokser. Alvorlighet høy beholdes.",
+        "kilder": [
+          "ALARM-0331",
+          "LOG-0174"
+        ]
+      },
+      {
+        "tekst": "Fra 03:22 logger varsling gjentatte SmsBud-timeouts (10 s) og HTTP 429 (retry-after 30s), for malene engangskode og leveringsvarsel. Køen gikk fra normalt <50 til 1 240 (03:27) og 2 310 (03:35). Siste logg i varsling-vinduet er 03:44.",
+        "kilder": [
+          "LOG-0131",
+          "LOG-0137",
+          "LOG-0155",
+          "LOG-0202",
+          "LOG-0242"
+        ]
+      },
+      {
+        "tekst": "Noen SMS gikk gjennom i perioden (03:14 og 03:34), så SmsBud er ikke helt nede. E-post (412 sendt, 0 feil siste 10 min kl 03:38) og push fungerer.",
+        "kilder": [
+          "LOG-0112",
+          "LOG-0198",
+          "LOG-0219"
+        ]
+      },
+      {
+        "tekst": "SmsBuds statusside viste «ingen kjente avvik» kl 03:34, men var sist oppdatert 02:10. Runbooken advarer om at siden oppdateres sent, så den utelukker ikke avvik.",
+        "kilder": [
+          "LOG-0196",
+          "RUNBOOK-varsling"
+        ]
+      },
+      {
+        "tekst": "Deploy 26.10 (v1.22.0) oppgraderte SmsBud-klienten 3.1→3.2. Retry-policy gikk fra 3 forsøk med eksponentiell pause til 5 forsøk med kort pause. Loggene viser forsøk opptil 5 av 5.",
+        "kilder": [
+          "DEPLOY-005",
+          "LOG-0176"
+        ]
+      },
+      {
+        "tekst": "Innlogging har advarsler om engangskode-SMS som ikke er bekreftet levert innen 60 s (03:28 og 03:37). Enkelte passord+sms-innlogginger lyktes (03:26 og 03:42).",
+        "kilder": [
+          "LOG-0164",
+          "LOG-0218",
+          "LOG-0152",
+          "LOG-0240"
+        ]
+      }
+    ],
+    "hypoteser": [
+      {
+        "tekst": "Primært: SmsBud er degradert (timeouts), og den nye retry-policyen (5 forsøk, kort pause) forsterker belastningen. Retry-stormen gir 429-rate-limiting hos SmsBud og vokser køen. Dette er en hypotese om samspill, ikke bevist.",
+        "sikkerhet": "middels",
+        "kilder": [
+          "LOG-0131",
+          "LOG-0137",
+          "DEPLOY-005",
+          "LOG-0155"
+        ],
+        "motbevis": [
+          "Deployen skjedde tre dager før feilen, og første symptom kom først 03:22.",
+          "Det finnes ingen data om hvor mange kall og forsøk per minutt vi sender, så retry-forsterkning er ikke målt.",
+          "Timeouts alene kan tyde på ren leverandørfeil, slik som i INC-2026-018 (en analogi, ikke et bevis)."
+        ]
+      },
+      {
+        "tekst": "Alternativ: ren leverandørfeil hos SmsBud uavhengig av vår retry-policy.",
+        "sikkerhet": "middels",
+        "kilder": [
+          "LOG-0131",
+          "LOG-0196",
+          "INC-2026-018"
+        ],
+        "motbevis": [
+          "429-feil peker på at vi sender for mye, og ikke bare på leverandøravbrudd (runbook).",
+          "Statussiden viser ingen avvik, men den er forsinket og kan ikke brukes som motbevis."
+        ]
+      }
+    ],
+    "usikkerhet": [
+      "Det er uklart hva som utløste feilen kl 03:22, og hvilken del som er SmsBuds feil og hvilken del som er vår egen retry-trafikk.",
+      "Det finnes ingen målinger etter ca. 03:45 av leveringsrate eller kø. Tilstanden ved observasjonstidspunktet er ukjent.",
+      "Omfanget for engangskoder er ukjent: det er bare noen få enkeltvarsler fra innlogging, og ingen rate.",
+      "Avgrensning: innlogging har samtidig en separat kunde-db-feil (too many connections og økende trege sesjonsspørringer fra 03:31). Den er ikke analysert her og er ikke vist å henge sammen med SMS-problemet.",
+      "Runbookens forslag om å pause leveringsvarsler er fra 2026-04-05 og tar ikke hensyn til den nye retry-policyen. Den bør vurderes av et menneske."
+    ],
+    "neste_steg": [
+      {
+        "tiltak": "Vakt i Team Ugla vurderer å pause leveringsvarsler (`varslingctl pause mal=leveringsvarsel`, per runbook, ettersom køen er over 1000) for å prioritere engangskoder. Vakt kontakter også SmsBud døgnvakt (runbook: ring hvis feilen varer over 30 min; feilen startet 03:22). Be om bekreftelse på avvik og rate-limit-status.",
+        "ansvarlig": "Team Ugla vakt (primær Jonas Kistesen, sekundær Live Huldersen)",
+        "verifisering": "Kontroller at kø sms-utgående synker mot normalt (<50) og at leveringsraten er tilbake over 90 % over et faktisk måleintervall på minst 10 min. Kontroller at engangskoder leveres.",
+        "kilder": [
+          "RUNBOOK-varsling",
+          "LOG-0155",
+          "LOG-0202",
+          "ALARM-0331"
+        ]
+      },
+      {
+        "tiltak": "Vurder å rulle tilbake eller justere retry-policyen fra DEPLOY-005, med eksponentiell pause og færre forsøk, hvis utsendingsloggene bekrefter retry-forsterkning. Bekreft først mengden forsøk per minutt mot SmsBud.",
+        "ansvarlig": "Team Ugla (Jonas Kistesen, som utførte deployen)",
+        "verifisering": "Kontroller at antall 429-svar faller og at forsøkene per melding ikke overstiger den nye grensen. Dette er et forslag, ikke et runbook-krav.",
+        "kilder": [
+          "DEPLOY-005",
+          "LOG-0137",
+          "LOG-0242"
+        ]
+      },
+      {
+        "tiltak": "Si fra til Team Nøkkelknippe siden engangskoder for innlogging kan være rammet (runbook). Hold den separate kunde-db-feilen i innlogging som egen hendelse.",
+        "ansvarlig": "Team Ugla vakt",
+        "verifisering": "Kontroller at Team Nøkkelknippe har bekreftet mottak, og at advarslene om engangskode-SMS som ikke er bekreftet levert (innlogging) opphører.",
+        "kilder": [
+          "RUNBOOK-varsling",
+          "LOG-0164",
+          "LOG-0218"
+        ]
+      }
+    ],
+    "eskalering": "Vekk vakt i Team Ugla (primær Jonas Kistesen, sekundær Live Huldersen). Si fra til Team Nøkkelknippe om engangskoder. Ring SmsBud døgnvakt (nummer i passordhvelvet) hvis feilen fortsatt varer, siden den startet 03:22. Ingenting er utført av denne analysen."
+  },
+  "ved": "2026-10-29T03:48:05+01:00",
+  "modus": "modell",
+  "modell": "claude-sonnet-5-5",
+  "iterasjoner": 4,
+  "verktoykall": 7,
+  "bruk": {
+    "input_tokens": 50035,
+    "output_tokens": 6242,
+    "cache_read_input_tokens": 0,
+    "cache_creation_input_tokens": 0
+  },
+  "kilder": [
+    {
+      "id": "ALARM-0331",
+      "tid": "2026-10-29T03:31:00+01:00",
+      "tjeneste": "varsling",
+      "alvorlighet": "høy",
+      "tittel": "SMS-leveringsrate lav",
+      "tekst": "varsling: bare 58 % av SMS-er levert siste 10 min (terskel 90 %). Kø sms-utgående vokser.",
+      "kilde_id": "ALARM-0331",
+      "fil": "data/alarmer.json"
+    },
+    {
+      "navn": "varsling",
+      "beskrivelse": "Sender SMS (via SmsBud), e-post og push. Engangskoder for innlogging går herfra.",
+      "eier_team": "Team Ugla",
+      "vakt": {
+        "primær": "Jonas Kistesen",
+        "sekundær": "Live Huldersen"
+      },
+      "avhengigheter": [
+        "SmsBud (ekstern)"
+      ],
+      "kilde_id": "TJENESTE-varsling",
+      "fil": "data/tjenester.json"
+    },
+    {
+      "tid": "2026-10-29T03:01:45+01:00",
+      "tjeneste": "varsling",
+      "nivå": "INFO",
+      "melding": "push sendt kanal=app",
+      "kilde_id": "LOG-0071",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:04:21+01:00",
+      "tjeneste": "varsling",
+      "nivå": "INFO",
+      "melding": "e-post sendt mal=passord-reset",
+      "kilde_id": "LOG-0081",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:08:16+01:00",
+      "tjeneste": "varsling",
+      "nivå": "INFO",
+      "melding": "push sendt kanal=app",
+      "kilde_id": "LOG-0090",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:13:07+01:00",
+      "tjeneste": "varsling",
+      "nivå": "INFO",
+      "melding": "push sendt kanal=app",
+      "kilde_id": "LOG-0108",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:14:19+01:00",
+      "tjeneste": "varsling",
+      "nivå": "INFO",
+      "melding": "sms sendt via SmsBud mal=engangskode",
+      "kilde_id": "LOG-0112",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:22:15+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "SmsBud: timeout etter 10000ms (forsøk 1 av 5) mal=engangskode",
+      "kilde_id": "LOG-0131",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:23:02+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "SmsBud: timeout etter 10000ms (forsøk 1 av 5) mal=engangskode",
+      "kilde_id": "LOG-0133",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:23:40+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "SmsBud: HTTP 429 Too Many Requests (retry-after 30s) mal=engangskode",
+      "kilde_id": "LOG-0137",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:24:55+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "SmsBud: timeout etter 10000ms (forsøk 3 av 5) mal=leveringsvarsel",
+      "kilde_id": "LOG-0143",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:25:30+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "SmsBud: timeout etter 10000ms (forsøk 4 av 5) mal=leveringsvarsel",
+      "kilde_id": "LOG-0146",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:26:18+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "SmsBud: HTTP 429 Too Many Requests (retry-after 30s) mal=engangskode",
+      "kilde_id": "LOG-0149",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:27:00+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "kø sms-utgående: 1 240 ventende (normalt < 50)",
+      "kilde_id": "LOG-0155",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:27:09+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "SmsBud: timeout etter 10000ms (forsøk 1 av 5) mal=leveringsvarsel",
+      "kilde_id": "LOG-0156",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:28:01+01:00",
+      "tjeneste": "varsling",
+      "nivå": "INFO",
+      "melding": "push sendt kanal=app",
+      "kilde_id": "LOG-0163",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:28:44+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "SmsBud: timeout etter 10000ms (forsøk 2 av 5) mal=engangskode",
+      "kilde_id": "LOG-0166",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:29:20+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "SmsBud: HTTP 429 Too Many Requests (retry-after 30s) mal=leveringsvarsel",
+      "kilde_id": "LOG-0167",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:29:57+01:00",
+      "tjeneste": "varsling",
+      "nivå": "INFO",
+      "melding": "e-post sendt mal=kvittering",
+      "kilde_id": "LOG-0169",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:30:05+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "SmsBud: timeout etter 10000ms (forsøk 4 av 5) mal=engangskode",
+      "kilde_id": "LOG-0172",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:31:00+01:00",
+      "tjeneste": "varsling",
+      "nivå": "ERROR",
+      "melding": "SMS-leveringsrate siste 10 min: 58% (terskel 90%)",
+      "kilde_id": "LOG-0174",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:31:12+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "SmsBud: timeout etter 10000ms (forsøk 5 av 5) mal=engangskode",
+      "kilde_id": "LOG-0176",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:33:40+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "SmsBud: HTTP 429 Too Many Requests (retry-after 30s) mal=engangskode",
+      "kilde_id": "LOG-0192",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:34:20+01:00",
+      "tjeneste": "varsling",
+      "nivå": "INFO",
+      "melding": "SmsBud statusside: ingen kjente avvik (sist oppdatert 02:10)",
+      "kilde_id": "LOG-0196",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:34:34+01:00",
+      "tjeneste": "varsling",
+      "nivå": "INFO",
+      "melding": "sms sendt via SmsBud mal=engangskode",
+      "kilde_id": "LOG-0198",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:35:00+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "kø sms-utgående: 2 310 ventende",
+      "kilde_id": "LOG-0202",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:36:02+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "SmsBud: timeout etter 10000ms (forsøk 2 av 5) mal=leveringsvarsel",
+      "kilde_id": "LOG-0211",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:38:00+01:00",
+      "tjeneste": "varsling",
+      "nivå": "INFO",
+      "melding": "e-postkanal normal: 412 sendt siste 10 min, 0 feil",
+      "kilde_id": "LOG-0219",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:39:15+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "SmsBud: timeout etter 10000ms (forsøk 3 av 5) mal=leveringsvarsel",
+      "kilde_id": "LOG-0225",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:42:30+01:00",
+      "tjeneste": "varsling",
+      "nivå": "WARN",
+      "melding": "SmsBud: HTTP 429 Too Many Requests (retry-after 30s) mal=leveringsvarsel",
+      "kilde_id": "LOG-0242",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:44:52+01:00",
+      "tjeneste": "varsling",
+      "nivå": "INFO",
+      "melding": "e-post sendt mal=kvittering",
+      "kilde_id": "LOG-0246",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-26T11:30:00+01:00",
+      "tjeneste": "varsling",
+      "versjon": "1.22.0",
+      "av": "Jonas Kistesen",
+      "endring": "Oppgradert SmsBud-klient fra 3.1 til 3.2. Ny retry-policy: 5 forsøk med kort pause (før: 3 forsøk med eksponentiell pause).",
+      "kilde_id": "DEPLOY-005",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "kilde_id": "RUNBOOK-varsling",
+      "fil": "data/runbooks/varsling.md",
+      "tjeneste": "varsling",
+      "sist_oppdatert": "2026-04-05",
+      "innhold": "# Runbook: varsling\n\nSist oppdatert: 2026-04-05 (Team Ugla)\n\n## SMS leveres ikke\n\nSMS går via ekstern leverandør SmsBud. E-post og push går en annen vei og er sjelden rammet samtidig.\n\n1. Sjekk SmsBud sin statusside. Den oppdateres ofte sent, så «ingen avvik» betyr ikke at alt er bra.\n2. Se på feiltypen i loggene:\n   - Bare timeout: sannsynligvis SmsBud.\n   - HTTP 429: vi sender for mye. Sjekk om noe hos oss sender i løkke.\n3. Engangskoder for innlogging er viktigst. Hvis køen vokser over 1000, vurder å pause leveringsvarsler med `varslingctl pause mal=leveringsvarsel`.\n4. Ring SmsBud døgnvakt hvis feilen varer over 30 min (nummer i passordhvelvet).\n\n## Hvem vekkes\n\nVakt i Team Ugla. Si også fra til Team Nøkkelknippe hvis engangskoder er rammet.\n"
+    },
+    {
+      "id": "INC-2026-018",
+      "dato": "2026-04-02",
+      "tjeneste": "varsling",
+      "alvorlighet": "høy",
+      "tittel": "SMS-leveranse nede hos SmsBud",
+      "sammendrag": "Alle SMS-kall feilet med timeout fra 14:10. SmsBud bekreftet driftsavbrudd på sin statusside kl 14:25. E-post og push gikk som normalt.",
+      "rotårsak": "Driftsavbrudd hos ekstern leverandør SmsBud.",
+      "tiltak": "Ventet på SmsBud. Satt opp varsel på statussiden deres. Diskutert reserveleverandør, ikke besluttet.",
+      "varighet_min": 72,
+      "kilde_id": "INC-2026-018",
+      "fil": "data/hendelser.json"
+    },
+    {
+      "tid": "2026-10-29T03:24:23+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "token fornyet bruker=844522",
+      "kilde_id": "LOG-0142",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:26:43+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "innlogging ok bruker=715841 metode=passord+sms",
+      "kilde_id": "LOG-0152",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:28:00+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "innlogging ok bruker=648332 metode=passkey",
+      "kilde_id": "LOG-0161",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:28:05+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "engangskode-SMS ikke bekreftet levert innen 60s bruker=718220",
+      "kilde_id": "LOG-0164",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:31:20+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 2.4s",
+      "kilde_id": "LOG-0177",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:31:59+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "utlogget bruker=450467",
+      "kilde_id": "LOG-0182",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:32:15+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 5.5s",
+      "kilde_id": "LOG-0184",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:33:05+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 8.6s",
+      "kilde_id": "LOG-0187",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:34:12+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 11.7s",
+      "kilde_id": "LOG-0195",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:35:05+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "ERROR",
+      "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+      "kilde_id": "LOG-0204",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:35:40+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 14.8s",
+      "kilde_id": "LOG-0208",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:36:30+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "ERROR",
+      "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+      "kilde_id": "LOG-0215",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:37:01+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 17.9s",
+      "kilde_id": "LOG-0216",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:37:40+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "engangskode-SMS ikke bekreftet levert innen 60s bruker=302917",
+      "kilde_id": "LOG-0218",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:39:30+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 21.0s",
+      "kilde_id": "LOG-0226",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:40:12+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "ERROR",
+      "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+      "kilde_id": "LOG-0229",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:40:21+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "utlogget bruker=105349",
+      "kilde_id": "LOG-0230",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:42:10+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "innlogging ok bruker=367982 metode=passord+sms",
+      "kilde_id": "LOG-0240",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:42:22+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "token fornyet bruker=281070",
+      "kilde_id": "LOG-0241",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:45:01+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "token fornyet bruker=798850",
+      "kilde_id": "LOG-0247",
+      "fil": "data/logger.json"
+    }
+  ],
+  "spor": [
+    {
+      "type": "runde",
+      "nummer": 1,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 6091,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 352,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "hent_alarmer",
+      "input": {
+        "id": "ALARM-0331"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 1
+        },
+        "alarmer": [
+          {
+            "id": "ALARM-0331",
+            "tid": "2026-10-29T03:31:00+01:00",
+            "tjeneste": "varsling",
+            "alvorlighet": "høy",
+            "tittel": "SMS-leveringsrate lav",
+            "tekst": "varsling: bare 58 % av SMS-er levert siste 10 min (terskel 90 %). Kø sms-utgående vokser.",
+            "kilde_id": "ALARM-0331",
+            "fil": "data/alarmer.json"
+          }
+        ],
+        "kilder": [
+          "ALARM-0331"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "hent_tjenesteinfo",
+      "input": {
+        "tjeneste": "varsling"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 1,
+          "merknad": "Tjenestekatalogen er udatert. Historisk korrekthet ved eldre observasjonstid kan ikke bekreftes."
+        },
+        "tjenester": [
+          {
+            "navn": "varsling",
+            "beskrivelse": "Sender SMS (via SmsBud), e-post og push. Engangskoder for innlogging går herfra.",
+            "eier_team": "Team Ugla",
+            "vakt": {
+              "primær": "Jonas Kistesen",
+              "sekundær": "Live Huldersen"
+            },
+            "avhengigheter": [
+              "SmsBud (ekstern)"
+            ],
+            "kilde_id": "TJENESTE-varsling",
+            "fil": "data/tjenester.json"
+          }
+        ],
+        "kilder": [
+          "TJENESTE-varsling"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sok_i_logger",
+      "input": {
+        "tjeneste": "varsling",
+        "fra": "03:00",
+        "til": "03:48:05",
+        "maks": 100
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "filtre": {
+            "tjeneste": "varsling",
+            "fra": "03:00",
+            "til": "03:48:05",
+            "maks": 100
+          },
+          "total": 29,
+          "returnert": 29,
+          "offset": 0,
+          "maks": 100,
+          "avkortet": false,
+          "neste_offset": null,
+          "første_treff": "2026-10-29T03:01:45+01:00",
+          "siste_treff": "2026-10-29T03:44:52+01:00",
+          "datavindu": {
+            "fra": "2026-10-29T02:30:04+01:00",
+            "til": "2026-10-29T03:48:05+01:00"
+          },
+          "merknad": null
+        },
+        "logger": [
+          {
+            "tid": "2026-10-29T03:01:45+01:00",
+            "tjeneste": "varsling",
+            "nivå": "INFO",
+            "melding": "push sendt kanal=app",
+            "kilde_id": "LOG-0071",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:04:21+01:00",
+            "tjeneste": "varsling",
+            "nivå": "INFO",
+            "melding": "e-post sendt mal=passord-reset",
+            "kilde_id": "LOG-0081",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:08:16+01:00",
+            "tjeneste": "varsling",
+            "nivå": "INFO",
+            "melding": "push sendt kanal=app",
+            "kilde_id": "LOG-0090",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:13:07+01:00",
+            "tjeneste": "varsling",
+            "nivå": "INFO",
+            "melding": "push sendt kanal=app",
+            "kilde_id": "LOG-0108",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:14:19+01:00",
+            "tjeneste": "varsling",
+            "nivå": "INFO",
+            "melding": "sms sendt via SmsBud mal=engangskode",
+            "kilde_id": "LOG-0112",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:22:15+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "SmsBud: timeout etter 10000ms (forsøk 1 av 5) mal=engangskode",
+            "kilde_id": "LOG-0131",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:23:02+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "SmsBud: timeout etter 10000ms (forsøk 1 av 5) mal=engangskode",
+            "kilde_id": "LOG-0133",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:23:40+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "SmsBud: HTTP 429 Too Many Requests (retry-after 30s) mal=engangskode",
+            "kilde_id": "LOG-0137",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:24:55+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "SmsBud: timeout etter 10000ms (forsøk 3 av 5) mal=leveringsvarsel",
+            "kilde_id": "LOG-0143",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:25:30+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "SmsBud: timeout etter 10000ms (forsøk 4 av 5) mal=leveringsvarsel",
+            "kilde_id": "LOG-0146",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:26:18+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "SmsBud: HTTP 429 Too Many Requests (retry-after 30s) mal=engangskode",
+            "kilde_id": "LOG-0149",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:27:00+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "kø sms-utgående: 1 240 ventende (normalt < 50)",
+            "kilde_id": "LOG-0155",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:27:09+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "SmsBud: timeout etter 10000ms (forsøk 1 av 5) mal=leveringsvarsel",
+            "kilde_id": "LOG-0156",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:28:01+01:00",
+            "tjeneste": "varsling",
+            "nivå": "INFO",
+            "melding": "push sendt kanal=app",
+            "kilde_id": "LOG-0163",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:28:44+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "SmsBud: timeout etter 10000ms (forsøk 2 av 5) mal=engangskode",
+            "kilde_id": "LOG-0166",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:29:20+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "SmsBud: HTTP 429 Too Many Requests (retry-after 30s) mal=leveringsvarsel",
+            "kilde_id": "LOG-0167",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:29:57+01:00",
+            "tjeneste": "varsling",
+            "nivå": "INFO",
+            "melding": "e-post sendt mal=kvittering",
+            "kilde_id": "LOG-0169",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:30:05+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "SmsBud: timeout etter 10000ms (forsøk 4 av 5) mal=engangskode",
+            "kilde_id": "LOG-0172",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:31:00+01:00",
+            "tjeneste": "varsling",
+            "nivå": "ERROR",
+            "melding": "SMS-leveringsrate siste 10 min: 58% (terskel 90%)",
+            "kilde_id": "LOG-0174",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:31:12+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "SmsBud: timeout etter 10000ms (forsøk 5 av 5) mal=engangskode",
+            "kilde_id": "LOG-0176",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:33:40+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "SmsBud: HTTP 429 Too Many Requests (retry-after 30s) mal=engangskode",
+            "kilde_id": "LOG-0192",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:34:20+01:00",
+            "tjeneste": "varsling",
+            "nivå": "INFO",
+            "melding": "SmsBud statusside: ingen kjente avvik (sist oppdatert 02:10)",
+            "kilde_id": "LOG-0196",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:34:34+01:00",
+            "tjeneste": "varsling",
+            "nivå": "INFO",
+            "melding": "sms sendt via SmsBud mal=engangskode",
+            "kilde_id": "LOG-0198",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:35:00+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "kø sms-utgående: 2 310 ventende",
+            "kilde_id": "LOG-0202",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:36:02+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "SmsBud: timeout etter 10000ms (forsøk 2 av 5) mal=leveringsvarsel",
+            "kilde_id": "LOG-0211",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:38:00+01:00",
+            "tjeneste": "varsling",
+            "nivå": "INFO",
+            "melding": "e-postkanal normal: 412 sendt siste 10 min, 0 feil",
+            "kilde_id": "LOG-0219",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:39:15+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "SmsBud: timeout etter 10000ms (forsøk 3 av 5) mal=leveringsvarsel",
+            "kilde_id": "LOG-0225",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:42:30+01:00",
+            "tjeneste": "varsling",
+            "nivå": "WARN",
+            "melding": "SmsBud: HTTP 429 Too Many Requests (retry-after 30s) mal=leveringsvarsel",
+            "kilde_id": "LOG-0242",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:44:52+01:00",
+            "tjeneste": "varsling",
+            "nivå": "INFO",
+            "melding": "e-post sendt mal=kvittering",
+            "kilde_id": "LOG-0246",
+            "fil": "data/logger.json"
+          }
+        ],
+        "kilder": [
+          "LOG-0071",
+          "LOG-0081",
+          "LOG-0090",
+          "LOG-0108",
+          "LOG-0112",
+          "LOG-0131",
+          "LOG-0133",
+          "LOG-0137",
+          "LOG-0143",
+          "LOG-0146",
+          "LOG-0149",
+          "LOG-0155",
+          "LOG-0156",
+          "LOG-0163",
+          "LOG-0166",
+          "LOG-0167",
+          "LOG-0169",
+          "LOG-0172",
+          "LOG-0174",
+          "LOG-0176",
+          "LOG-0192",
+          "LOG-0196",
+          "LOG-0198",
+          "LOG-0202",
+          "LOG-0211",
+          "LOG-0219",
+          "LOG-0225",
+          "LOG-0242",
+          "LOG-0246"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sjekk_deploy_historikk",
+      "input": {
+        "tjeneste": "varsling"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 1
+        },
+        "deployer": [
+          {
+            "tid": "2026-10-26T11:30:00+01:00",
+            "tjeneste": "varsling",
+            "versjon": "1.22.0",
+            "av": "Jonas Kistesen",
+            "endring": "Oppgradert SmsBud-klient fra 3.1 til 3.2. Ny retry-policy: 5 forsøk med kort pause (før: 3 forsøk med eksponentiell pause).",
+            "kilde_id": "DEPLOY-005",
+            "fil": "data/deploy-historikk.json"
+          }
+        ],
+        "kilder": [
+          "DEPLOY-005"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "hent_runbook",
+      "input": {
+        "tjeneste": "varsling"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "merknad": "Runbookens dato må kryssjekkes. En eldre anbefaling kan bygge på et oppsett som ikke lenger finnes."
+        },
+        "runbook": {
+          "kilde_id": "RUNBOOK-varsling",
+          "fil": "data/runbooks/varsling.md",
+          "tjeneste": "varsling",
+          "sist_oppdatert": "2026-04-05",
+          "innhold": "# Runbook: varsling\n\nSist oppdatert: 2026-04-05 (Team Ugla)\n\n## SMS leveres ikke\n\nSMS går via ekstern leverandør SmsBud. E-post og push går en annen vei og er sjelden rammet samtidig.\n\n1. Sjekk SmsBud sin statusside. Den oppdateres ofte sent, så «ingen avvik» betyr ikke at alt er bra.\n2. Se på feiltypen i loggene:\n   - Bare timeout: sannsynligvis SmsBud.\n   - HTTP 429: vi sender for mye. Sjekk om noe hos oss sender i løkke.\n3. Engangskoder for innlogging er viktigst. Hvis køen vokser over 1000, vurder å pause leveringsvarsler med `varslingctl pause mal=leveringsvarsel`.\n4. Ring SmsBud døgnvakt hvis feilen varer over 30 min (nummer i passordhvelvet).\n\n## Hvem vekkes\n\nVakt i Team Ugla. Si også fra til Team Nøkkelknippe hvis engangskoder er rammet.\n"
+        },
+        "kilder": [
+          "RUNBOOK-varsling"
+        ]
+      }
+    },
+    {
+      "type": "runde",
+      "nummer": 2,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 11461,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 293,
+        "output_tokens_details": {
+          "thinking_tokens": 100
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "finn_lignende_hendelser",
+      "input": {
+        "tjeneste": "varsling",
+        "tekst": "SmsBud"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 1,
+          "merknad": "Dato angir hendelsesdag. Tidspunkt for publisering av post-mortem finnes ikke; tilgjengelighet den samme dagen er usikker."
+        },
+        "hendelser": [
+          {
+            "id": "INC-2026-018",
+            "dato": "2026-04-02",
+            "tjeneste": "varsling",
+            "alvorlighet": "høy",
+            "tittel": "SMS-leveranse nede hos SmsBud",
+            "sammendrag": "Alle SMS-kall feilet med timeout fra 14:10. SmsBud bekreftet driftsavbrudd på sin statusside kl 14:25. E-post og push gikk som normalt.",
+            "rotårsak": "Driftsavbrudd hos ekstern leverandør SmsBud.",
+            "tiltak": "Ventet på SmsBud. Satt opp varsel på statussiden deres. Diskutert reserveleverandør, ikke besluttet.",
+            "varighet_min": 72,
+            "kilde_id": "INC-2026-018",
+            "fil": "data/hendelser.json"
+          }
+        ],
+        "kilder": [
+          "INC-2026-018"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sok_i_logger",
+      "input": {
+        "tjeneste": "innlogging",
+        "fra": "03:15",
+        "til": "03:48:05"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "filtre": {
+            "tjeneste": "innlogging",
+            "fra": "03:15",
+            "til": "03:48:05"
+          },
+          "total": 20,
+          "returnert": 20,
+          "offset": 0,
+          "maks": 50,
+          "avkortet": false,
+          "neste_offset": null,
+          "første_treff": "2026-10-29T03:24:23+01:00",
+          "siste_treff": "2026-10-29T03:45:01+01:00",
+          "datavindu": {
+            "fra": "2026-10-29T02:30:04+01:00",
+            "til": "2026-10-29T03:48:05+01:00"
+          },
+          "merknad": null
+        },
+        "logger": [
+          {
+            "tid": "2026-10-29T03:24:23+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "token fornyet bruker=844522",
+            "kilde_id": "LOG-0142",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:26:43+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "innlogging ok bruker=715841 metode=passord+sms",
+            "kilde_id": "LOG-0152",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:28:00+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "innlogging ok bruker=648332 metode=passkey",
+            "kilde_id": "LOG-0161",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:28:05+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "engangskode-SMS ikke bekreftet levert innen 60s bruker=718220",
+            "kilde_id": "LOG-0164",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:31:20+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 2.4s",
+            "kilde_id": "LOG-0177",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:31:59+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "utlogget bruker=450467",
+            "kilde_id": "LOG-0182",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:32:15+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 5.5s",
+            "kilde_id": "LOG-0184",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:33:05+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 8.6s",
+            "kilde_id": "LOG-0187",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:34:12+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 11.7s",
+            "kilde_id": "LOG-0195",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:35:05+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "ERROR",
+            "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+            "kilde_id": "LOG-0204",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:35:40+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 14.8s",
+            "kilde_id": "LOG-0208",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:36:30+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "ERROR",
+            "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+            "kilde_id": "LOG-0215",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:37:01+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 17.9s",
+            "kilde_id": "LOG-0216",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:37:40+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "engangskode-SMS ikke bekreftet levert innen 60s bruker=302917",
+            "kilde_id": "LOG-0218",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:39:30+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 21.0s",
+            "kilde_id": "LOG-0226",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:40:12+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "ERROR",
+            "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+            "kilde_id": "LOG-0229",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:40:21+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "utlogget bruker=105349",
+            "kilde_id": "LOG-0230",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:42:10+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "innlogging ok bruker=367982 metode=passord+sms",
+            "kilde_id": "LOG-0240",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:42:22+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "token fornyet bruker=281070",
+            "kilde_id": "LOG-0241",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:45:01+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "token fornyet bruker=798850",
+            "kilde_id": "LOG-0247",
+            "fil": "data/logger.json"
+          }
+        ],
+        "kilder": [
+          "LOG-0142",
+          "LOG-0152",
+          "LOG-0161",
+          "LOG-0164",
+          "LOG-0177",
+          "LOG-0182",
+          "LOG-0184",
+          "LOG-0187",
+          "LOG-0195",
+          "LOG-0204",
+          "LOG-0208",
+          "LOG-0215",
+          "LOG-0216",
+          "LOG-0218",
+          "LOG-0226",
+          "LOG-0229",
+          "LOG-0230",
+          "LOG-0240",
+          "LOG-0241",
+          "LOG-0247"
+        ]
+      }
+    },
+    {
+      "type": "runde",
+      "nummer": 3,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 14632,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 2785,
+        "output_tokens_details": {
+          "thinking_tokens": 33
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "valideringsfeil",
+      "melding": "Ugyldig rapport (rapport.fakta[5].kilde_id_merk): ukjent felt."
+    },
+    {
+      "type": "runde",
+      "nummer": 4,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 17851,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 2812,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "rapport",
+      "melding": "Rapportformat og kilde-ID-er er kontrollert."
+    }
+  ]
+}

@@ -1,0 +1,993 @@
+{
+  "alarmId": "ALARM-0305",
+  "status": "ok",
+  "årsak": null,
+  "rapport": {
+    "tittel": "ALARM-0305: /var 91 % på innlogging-02 under loggrotasjon – avklart (disk normalisert 03:09)",
+    "alvorlighet": "advarsel",
+    "status": "avklart",
+    "berorte_tjenester": [
+      "innlogging"
+    ],
+    "fakta": [
+      {
+        "tekst": "ALARM-0305 (advarsel) gikk 03:05: /var 91 % på innlogging-02, terskel 90 %.",
+        "kilder": [
+          "ALARM-0305"
+        ]
+      },
+      {
+        "tekst": "Loggrotasjon startet 03:00:01 på innlogging-02. Disken gikk fra 87 % (03:03:30) til 91 % (03:04:50) mens rotasjonen pågikk.",
+        "kilder": [
+          "LOG-0068",
+          "LOG-0077",
+          "LOG-0082"
+        ]
+      },
+      {
+        "tekst": "03:09:12 ble loggrotasjonen fullført. Den frigjorde 11,8 GB, og /var er 54 %. Arkivet innlogging-02-2026-10-28.tar.gz (12,4 GB) ble lastet opp 03:09:13. Dette er under runbookens grense på 70 % og kom innen 10 minutter.",
+        "kilder": [
+          "LOG-0095",
+          "LOG-0096",
+          "RUNBOOK-innlogging"
+        ]
+      },
+      {
+        "tekst": "Runbooken (oppdatert 2026-05-20) beskriver dette som kjent og ufarlig. Mønsteret i loggene stemmer med den. De to siste innlogging-deployene (4.8.1 den 28.10 og 4.8.0 den 20.10) gjelder feilmelding og passkey, og har ingen åpenbar kobling til disk.",
+        "kilder": [
+          "RUNBOOK-innlogging",
+          "DEPLOY-007",
+          "DEPLOY-001"
+        ]
+      }
+    ],
+    "hypoteser": [
+      {
+        "tekst": "Alarmen skyldes forventet midlertidig diskbruk under nattlig loggrotasjon (komprimering før sletting) og er ikke en reell diskmangel.",
+        "sikkerhet": "høy",
+        "kilder": [
+          "LOG-0068",
+          "LOG-0082",
+          "LOG-0095",
+          "RUNBOOK-innlogging"
+        ],
+        "motbevis": [
+          "Det finnes ingen diskmåling etter 03:09, så vi vet ikke om /var holder seg på 54 %.",
+          "Arkivet på 12,4 GB er stort, og vi har ikke undersøkt om det vokser over tid."
+        ]
+      }
+    ],
+    "usikkerhet": [
+      "Vi har ingen diskmålinger etter 03:09:12 og kan ikke si noe om status nå.",
+      "Ikke relatert til denne alarmen: fra ca. 03:31 viser innlogging økende treg sesjonsspørring mot kunde-db (2,4 s til 21 s) og feilen «too many connections» (03:35–03:40). Det er sannsynligvis en separat hendelse i kunde-db. Den er ikke analysert her og bør følges opp separat. Sporadiske SMS-leveringsvarsler (03:28, 03:37) er heller ikke undersøkt.",
+      "Det kan ikke utelukkes at rotasjonen belastet systemet, men diskhendelsen var over 03:09, før treghetene startet 03:31. Det er ingen bevist sammenheng."
+    ],
+    "neste_steg": [
+      {
+        "tiltak": "Ingen sletting av arkiver er nødvendig nå, siden disken er under 70 %. Vurder å varsle tidligere eller heve terskelen for tidsvinduet 03:00–03:20, eller å utvide /var. Dette er et forslag, ikke et runbook-krav.",
+        "ansvarlig": "Team Nøkkelknippe (primærvakt Hedda Uglevik)",
+        "verifisering": "Kontroller at /var på innlogging-01 og -02 er under 70 % etter neste loggrotasjon (kl. 03:00), og at «loggrotasjon fullført» logges innen 10 minutter.",
+        "kilder": [
+          "RUNBOOK-innlogging",
+          "LOG-0095",
+          "TJENESTE-innlogging"
+        ]
+      },
+      {
+        "tiltak": "Følg opp kunde-db-treghet og «too many connections» som en egen hendelse hos eier av kunde-db.",
+        "ansvarlig": "Eier av kunde-db, i samarbeid med Team Nøkkelknippe",
+        "verifisering": "Kontroller at slow-query-meldingene mot sesjoner og «too many connections»-feilene i innlogging stopper over et tidsvindu som er langt nok til å vise trenden.",
+        "kilder": [
+          "LOG-0204",
+          "LOG-0226",
+          "TJENESTE-innlogging"
+        ]
+      }
+    ],
+    "eskalering": "Ingen eskalering for diskalarmen, siden den er avklart. Team Nøkkelknippe (primærvakt Hedda Uglevik) bør informeres på normal arbeidstid. Den separate kunde-db-hendelsen krever egen vurdering og eskalering."
+  },
+  "ved": "2026-10-29T03:48:05+01:00",
+  "modus": "modell",
+  "modell": "claude-sonnet-5-5",
+  "iterasjoner": 2,
+  "verktoykall": 5,
+  "bruk": {
+    "input_tokens": 18091,
+    "output_tokens": 2178,
+    "cache_read_input_tokens": 0,
+    "cache_creation_input_tokens": 0
+  },
+  "kilder": [
+    {
+      "id": "ALARM-0305",
+      "tid": "2026-10-29T03:05:00+01:00",
+      "tjeneste": "innlogging",
+      "alvorlighet": "advarsel",
+      "tittel": "Diskbruk høy",
+      "tekst": "innlogging-02: /var er 91 % full (terskel 90 %).",
+      "kilde_id": "ALARM-0305",
+      "fil": "data/alarmer.json"
+    },
+    {
+      "navn": "innlogging",
+      "beskrivelse": "Innlogging, sesjoner og engangskoder. Sesjonene lagres i tabellen sesjoner i kunde-db.",
+      "eier_team": "Team Nøkkelknippe",
+      "vakt": {
+        "primær": "Hedda Uglevik",
+        "sekundær": "Petter Mørkeskog"
+      },
+      "avhengigheter": [
+        "kunde-db",
+        "varsling"
+      ],
+      "kilde_id": "TJENESTE-innlogging",
+      "fil": "data/tjenester.json"
+    },
+    {
+      "kilde_id": "RUNBOOK-innlogging",
+      "fil": "data/runbooks/innlogging.md",
+      "tjeneste": "innlogging",
+      "sist_oppdatert": "2026-05-20",
+      "innhold": "# Runbook: innlogging\n\nSist oppdatert: 2026-05-20 (Team Nøkkelknippe)\n\n## Diskbruk over 90 % på innlogging-01/-02\n\nLoggrotasjonen kjører kl 03:00 og pakker loggene før de gamle slettes. Disken blir midlertidig nesten full. Det er kjent og ufarlig.\n\n1. Se etter `loggrotasjon fullført` i loggene. Den kommer normalt innen 10 minutter.\n2. Hvis den er fullført og disken er under 70 %: ingenting å gjøre.\n3. Hvis disken fortsatt er over 90 % etter 03:20: slett gamle arkiver i `/var/log/innlogging/arkiv` som er eldre enn 7 dager.\n\n## Trege innlogginger / timeout mot databasen\n\nInnlogging har ikke egen database. Treghet mot kunde-db skyldes nesten alltid noe på databasesiden. Se runbook kunde-db.md.\n"
+    },
+    {
+      "tid": "2026-10-28T09:45:00+01:00",
+      "tjeneste": "innlogging",
+      "versjon": "4.8.1",
+      "av": "Hedda Uglevik",
+      "endring": "Retter tekst i feilmelding ved utløpt engangskode.",
+      "kilde_id": "DEPLOY-007",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-20T10:14:00+02:00",
+      "tjeneste": "innlogging",
+      "versjon": "4.8.0",
+      "av": "Hedda Uglevik",
+      "endring": "Passkey som innloggingsmetode for alle brukere.",
+      "kilde_id": "DEPLOY-001",
+      "fil": "data/deploy-historikk.json"
+    },
+    {
+      "tid": "2026-10-29T02:31:44+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "innlogging ok bruker=600676 metode=passkey",
+      "kilde_id": "LOG-0004",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:36:52+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "utlogget bruker=635370",
+      "kilde_id": "LOG-0014",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:47:03+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "mislykket innlogging bruker=551203 (feil passord, forsøk 3 av 5)",
+      "kilde_id": "LOG-0033",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:47:17+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "utlogget bruker=473927",
+      "kilde_id": "LOG-0035",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:50:23+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "innlogging ok bruker=662839 metode=passkey",
+      "kilde_id": "LOG-0040",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:50:25+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "token fornyet bruker=304036",
+      "kilde_id": "LOG-0041",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:51:58+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "innlogging ok bruker=617116 metode=passkey",
+      "kilde_id": "LOG-0046",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T02:57:08+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "innlogging ok bruker=977549 metode=passkey",
+      "kilde_id": "LOG-0059",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:00:01+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "cron: loggrotasjon startet på innlogging-02 (komprimerer /var/log/innlogging)",
+      "kilde_id": "LOG-0068",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:02:09+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "token fornyet bruker=769834",
+      "kilde_id": "LOG-0075",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:03:30+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "disk /var 87% på innlogging-02",
+      "kilde_id": "LOG-0077",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:04:50+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "disk /var 91% på innlogging-02",
+      "kilde_id": "LOG-0082",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:09:12+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "loggrotasjon fullført på innlogging-02: frigjort 11.8 GB, disk /var 54%",
+      "kilde_id": "LOG-0095",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:09:13+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "arkiv lastet opp: innlogging-02-2026-10-28.tar.gz (12.4 GB)",
+      "kilde_id": "LOG-0096",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:10:17+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "token fornyet bruker=345254",
+      "kilde_id": "LOG-0098",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:13:04+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "innlogging ok bruker=190357 metode=passord+sms",
+      "kilde_id": "LOG-0107",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:24:23+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "token fornyet bruker=844522",
+      "kilde_id": "LOG-0142",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:26:43+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "innlogging ok bruker=715841 metode=passord+sms",
+      "kilde_id": "LOG-0152",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:28:00+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "innlogging ok bruker=648332 metode=passkey",
+      "kilde_id": "LOG-0161",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:28:05+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "engangskode-SMS ikke bekreftet levert innen 60s bruker=718220",
+      "kilde_id": "LOG-0164",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:31:20+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 2.4s",
+      "kilde_id": "LOG-0177",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:31:59+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "utlogget bruker=450467",
+      "kilde_id": "LOG-0182",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:32:15+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 5.5s",
+      "kilde_id": "LOG-0184",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:33:05+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 8.6s",
+      "kilde_id": "LOG-0187",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:34:12+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 11.7s",
+      "kilde_id": "LOG-0195",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:35:05+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "ERROR",
+      "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+      "kilde_id": "LOG-0204",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:35:40+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 14.8s",
+      "kilde_id": "LOG-0208",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:36:30+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "ERROR",
+      "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+      "kilde_id": "LOG-0215",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:37:01+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 17.9s",
+      "kilde_id": "LOG-0216",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:37:40+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "engangskode-SMS ikke bekreftet levert innen 60s bruker=302917",
+      "kilde_id": "LOG-0218",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:39:30+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "WARN",
+      "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 21.0s",
+      "kilde_id": "LOG-0226",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:40:12+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "ERROR",
+      "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+      "kilde_id": "LOG-0229",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:40:21+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "utlogget bruker=105349",
+      "kilde_id": "LOG-0230",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:42:10+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "innlogging ok bruker=367982 metode=passord+sms",
+      "kilde_id": "LOG-0240",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:42:22+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "token fornyet bruker=281070",
+      "kilde_id": "LOG-0241",
+      "fil": "data/logger.json"
+    },
+    {
+      "tid": "2026-10-29T03:45:01+01:00",
+      "tjeneste": "innlogging",
+      "nivå": "INFO",
+      "melding": "token fornyet bruker=798850",
+      "kilde_id": "LOG-0247",
+      "fil": "data/logger.json"
+    }
+  ],
+  "spor": [
+    {
+      "type": "runde",
+      "nummer": 1,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 6069,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 309,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "hent_alarmer",
+      "input": {
+        "id": "ALARM-0305"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 1
+        },
+        "alarmer": [
+          {
+            "id": "ALARM-0305",
+            "tid": "2026-10-29T03:05:00+01:00",
+            "tjeneste": "innlogging",
+            "alvorlighet": "advarsel",
+            "tittel": "Diskbruk høy",
+            "tekst": "innlogging-02: /var er 91 % full (terskel 90 %).",
+            "kilde_id": "ALARM-0305",
+            "fil": "data/alarmer.json"
+          }
+        ],
+        "kilder": [
+          "ALARM-0305"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "hent_tjenesteinfo",
+      "input": {
+        "tjeneste": "innlogging"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 1,
+          "merknad": "Tjenestekatalogen er udatert. Historisk korrekthet ved eldre observasjonstid kan ikke bekreftes."
+        },
+        "tjenester": [
+          {
+            "navn": "innlogging",
+            "beskrivelse": "Innlogging, sesjoner og engangskoder. Sesjonene lagres i tabellen sesjoner i kunde-db.",
+            "eier_team": "Team Nøkkelknippe",
+            "vakt": {
+              "primær": "Hedda Uglevik",
+              "sekundær": "Petter Mørkeskog"
+            },
+            "avhengigheter": [
+              "kunde-db",
+              "varsling"
+            ],
+            "kilde_id": "TJENESTE-innlogging",
+            "fil": "data/tjenester.json"
+          }
+        ],
+        "kilder": [
+          "TJENESTE-innlogging"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "hent_runbook",
+      "input": {
+        "tjeneste": "innlogging"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "merknad": "Runbookens dato må kryssjekkes. En eldre anbefaling kan bygge på et oppsett som ikke lenger finnes."
+        },
+        "runbook": {
+          "kilde_id": "RUNBOOK-innlogging",
+          "fil": "data/runbooks/innlogging.md",
+          "tjeneste": "innlogging",
+          "sist_oppdatert": "2026-05-20",
+          "innhold": "# Runbook: innlogging\n\nSist oppdatert: 2026-05-20 (Team Nøkkelknippe)\n\n## Diskbruk over 90 % på innlogging-01/-02\n\nLoggrotasjonen kjører kl 03:00 og pakker loggene før de gamle slettes. Disken blir midlertidig nesten full. Det er kjent og ufarlig.\n\n1. Se etter `loggrotasjon fullført` i loggene. Den kommer normalt innen 10 minutter.\n2. Hvis den er fullført og disken er under 70 %: ingenting å gjøre.\n3. Hvis disken fortsatt er over 90 % etter 03:20: slett gamle arkiver i `/var/log/innlogging/arkiv` som er eldre enn 7 dager.\n\n## Trege innlogginger / timeout mot databasen\n\nInnlogging har ikke egen database. Treghet mot kunde-db skyldes nesten alltid noe på databasesiden. Se runbook kunde-db.md.\n"
+        },
+        "kilder": [
+          "RUNBOOK-innlogging"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sjekk_deploy_historikk",
+      "input": {
+        "tjeneste": "innlogging"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "total": 2
+        },
+        "deployer": [
+          {
+            "tid": "2026-10-28T09:45:00+01:00",
+            "tjeneste": "innlogging",
+            "versjon": "4.8.1",
+            "av": "Hedda Uglevik",
+            "endring": "Retter tekst i feilmelding ved utløpt engangskode.",
+            "kilde_id": "DEPLOY-007",
+            "fil": "data/deploy-historikk.json"
+          },
+          {
+            "tid": "2026-10-20T10:14:00+02:00",
+            "tjeneste": "innlogging",
+            "versjon": "4.8.0",
+            "av": "Hedda Uglevik",
+            "endring": "Passkey som innloggingsmetode for alle brukere.",
+            "kilde_id": "DEPLOY-001",
+            "fil": "data/deploy-historikk.json"
+          }
+        ],
+        "kilder": [
+          "DEPLOY-007",
+          "DEPLOY-001"
+        ]
+      }
+    },
+    {
+      "type": "verktoy",
+      "navn": "sok_i_logger",
+      "input": {
+        "tjeneste": "innlogging",
+        "fra": "02:00"
+      },
+      "cache": false,
+      "feil": false,
+      "resultat": {
+        "metadata": {
+          "ved": "2026-10-29T02:48:05.000Z",
+          "tidssone": "Europe/Oslo",
+          "modus": "siste_datapunkt",
+          "kun_lesing": true,
+          "filtre": {
+            "tjeneste": "innlogging",
+            "fra": "02:00"
+          },
+          "total": 36,
+          "returnert": 36,
+          "offset": 0,
+          "maks": 50,
+          "avkortet": false,
+          "neste_offset": null,
+          "første_treff": "2026-10-29T02:31:44+01:00",
+          "siste_treff": "2026-10-29T03:45:01+01:00",
+          "datavindu": {
+            "fra": "2026-10-29T02:30:04+01:00",
+            "til": "2026-10-29T03:48:05+01:00"
+          },
+          "merknad": null
+        },
+        "logger": [
+          {
+            "tid": "2026-10-29T02:31:44+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "innlogging ok bruker=600676 metode=passkey",
+            "kilde_id": "LOG-0004",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:36:52+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "utlogget bruker=635370",
+            "kilde_id": "LOG-0014",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:47:03+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "mislykket innlogging bruker=551203 (feil passord, forsøk 3 av 5)",
+            "kilde_id": "LOG-0033",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:47:17+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "utlogget bruker=473927",
+            "kilde_id": "LOG-0035",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:50:23+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "innlogging ok bruker=662839 metode=passkey",
+            "kilde_id": "LOG-0040",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:50:25+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "token fornyet bruker=304036",
+            "kilde_id": "LOG-0041",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:51:58+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "innlogging ok bruker=617116 metode=passkey",
+            "kilde_id": "LOG-0046",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T02:57:08+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "innlogging ok bruker=977549 metode=passkey",
+            "kilde_id": "LOG-0059",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:00:01+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "cron: loggrotasjon startet på innlogging-02 (komprimerer /var/log/innlogging)",
+            "kilde_id": "LOG-0068",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:02:09+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "token fornyet bruker=769834",
+            "kilde_id": "LOG-0075",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:03:30+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "disk /var 87% på innlogging-02",
+            "kilde_id": "LOG-0077",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:04:50+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "disk /var 91% på innlogging-02",
+            "kilde_id": "LOG-0082",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:09:12+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "loggrotasjon fullført på innlogging-02: frigjort 11.8 GB, disk /var 54%",
+            "kilde_id": "LOG-0095",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:09:13+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "arkiv lastet opp: innlogging-02-2026-10-28.tar.gz (12.4 GB)",
+            "kilde_id": "LOG-0096",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:10:17+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "token fornyet bruker=345254",
+            "kilde_id": "LOG-0098",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:13:04+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "innlogging ok bruker=190357 metode=passord+sms",
+            "kilde_id": "LOG-0107",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:24:23+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "token fornyet bruker=844522",
+            "kilde_id": "LOG-0142",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:26:43+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "innlogging ok bruker=715841 metode=passord+sms",
+            "kilde_id": "LOG-0152",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:28:00+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "innlogging ok bruker=648332 metode=passkey",
+            "kilde_id": "LOG-0161",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:28:05+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "engangskode-SMS ikke bekreftet levert innen 60s bruker=718220",
+            "kilde_id": "LOG-0164",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:31:20+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 2.4s",
+            "kilde_id": "LOG-0177",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:31:59+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "utlogget bruker=450467",
+            "kilde_id": "LOG-0182",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:32:15+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 5.5s",
+            "kilde_id": "LOG-0184",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:33:05+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 8.6s",
+            "kilde_id": "LOG-0187",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:34:12+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 11.7s",
+            "kilde_id": "LOG-0195",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:35:05+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "ERROR",
+            "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+            "kilde_id": "LOG-0204",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:35:40+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 14.8s",
+            "kilde_id": "LOG-0208",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:36:30+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "ERROR",
+            "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+            "kilde_id": "LOG-0215",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:37:01+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 17.9s",
+            "kilde_id": "LOG-0216",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:37:40+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "engangskode-SMS ikke bekreftet levert innen 60s bruker=302917",
+            "kilde_id": "LOG-0218",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:39:30+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "WARN",
+            "melding": "treg spørring mot kunde-db: SELECT ... FROM sesjoner 21.0s",
+            "kilde_id": "LOG-0226",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:40:12+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "ERROR",
+            "melding": "kunne ikke hente databasetilkobling: too many connections (kunde-db)",
+            "kilde_id": "LOG-0229",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:40:21+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "utlogget bruker=105349",
+            "kilde_id": "LOG-0230",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:42:10+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "innlogging ok bruker=367982 metode=passord+sms",
+            "kilde_id": "LOG-0240",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:42:22+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "token fornyet bruker=281070",
+            "kilde_id": "LOG-0241",
+            "fil": "data/logger.json"
+          },
+          {
+            "tid": "2026-10-29T03:45:01+01:00",
+            "tjeneste": "innlogging",
+            "nivå": "INFO",
+            "melding": "token fornyet bruker=798850",
+            "kilde_id": "LOG-0247",
+            "fil": "data/logger.json"
+          }
+        ],
+        "kilder": [
+          "LOG-0004",
+          "LOG-0014",
+          "LOG-0033",
+          "LOG-0035",
+          "LOG-0040",
+          "LOG-0041",
+          "LOG-0046",
+          "LOG-0059",
+          "LOG-0068",
+          "LOG-0075",
+          "LOG-0077",
+          "LOG-0082",
+          "LOG-0095",
+          "LOG-0096",
+          "LOG-0098",
+          "LOG-0107",
+          "LOG-0142",
+          "LOG-0152",
+          "LOG-0161",
+          "LOG-0164",
+          "LOG-0177",
+          "LOG-0182",
+          "LOG-0184",
+          "LOG-0187",
+          "LOG-0195",
+          "LOG-0204",
+          "LOG-0208",
+          "LOG-0215",
+          "LOG-0216",
+          "LOG-0218",
+          "LOG-0226",
+          "LOG-0229",
+          "LOG-0230",
+          "LOG-0240",
+          "LOG-0241",
+          "LOG-0247"
+        ]
+      }
+    },
+    {
+      "type": "runde",
+      "nummer": 2,
+      "stop_reason": "tool_use",
+      "bruk": {
+        "input_tokens": 12022,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 1869,
+        "output_tokens_details": {
+          "thinking_tokens": 37
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      }
+    },
+    {
+      "type": "rapport",
+      "melding": "Rapportformat og kilde-ID-er er kontrollert."
+    }
+  ]
+}
