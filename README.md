@@ -143,3 +143,4 @@ Manuell kontroll fant riktige hovedspor, men også unøyaktigheter om eskalering
 
 API-implementasjonen følger [Messages API](https://platform.claude.com/docs/en/build-with-claude/working-with-messages) og [håndtering av stoppgrunner](https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons). I tråd med [Sonnet 5.5-integrasjonen](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide) brukes automatisk verktøyvalg, uendret system-/verktøyprefiks og historikk som bare utvides. Budsjettbeskjeder legges til som nye meldinger; nye lesekall avvises lokalt når budsjettet er brukt opp. Modellnavn kan kontrolleres i [modelloversikten](https://platform.claude.com/docs/en/models/overview).
 # hckathon26
+# hckathon26
