@@ -1,0 +1,230 @@
+[
+  {
+    "alarmId": "ALARM-0312",
+    "title": "Betaling: kodefeil etter versjon 2.14.0",
+    "curated": true,
+    "asOf": "2026-10-29T03:48:05+01:00",
+    "alarmTime": "2026-10-29T03:12:00+01:00",
+    "severity": "kritisk",
+    "status": "pågår",
+    "affectedServices": ["betaling", "api-gateway"],
+    "requiredEvidence": ["ALARM-0312", "DEPLOY-009", "DEPLOY-002", "LOG-0044", "LOG-0048", "LOG-0049", "LOG-0103", "LOG-0254", "RUNBOOK-betaling", "TJENESTE-betaling"],
+    "facts": [
+      {"text": "Versjon 2.14.0 kjørte på alle tre betalingsinstanser kl 02:51:48. Endringen flyttet valutakilden fra transaksjonen til kortinfo-objektet.", "evidence": ["DEPLOY-009", "LOG-0044"]},
+      {"text": "Første observerte TypeError ved lesing av valuta i beregnGebyr, gebyr.js:88, kom kl 02:52:30, 42 sekunder etter utrullingen. Den er merket kort=utenlandsk; gatewayen ga samtidig 500 på trekk-endepunktet.", "evidence": ["LOG-0048", "LOG-0049"]},
+      {"text": "Alarmen og målingen kl 03:12 oppgir 9,4 % 5xx siste fem minutter. Dette er siste eksplisitte feilratemåling i datasettet, ikke en ny måling kl 03:48.", "evidence": ["ALARM-0312", "LOG-0103"]},
+      {"text": "Samme TypeError og 500 observeres fortsatt kl 03:47:42. Ingen utført rollback eller bekreftet bedring er dokumentert.", "evidence": ["LOG-0254", "LOG-0255"]}
+    ],
+    "hypothesis": {
+      "text": "Sterkt støttet hypotese: regresjon i gebyrberegningen i 2.14.0 ved manglende kortinfo for enkelte utenlandske kort. Tidsrekkefølge, feilsted og deploybeskrivelse peker samme vei; kodeinspeksjon mangler for endelig bekreftelse.",
+      "confidence": "høy",
+      "evidence": ["DEPLOY-009", "LOG-0044", "LOG-0048", "INC-2026-009"]
+    },
+    "uncertainty": [
+      "Loggene viser berørte eksempler, ikke at alle utenlandske kort feiler eller at alle betalinger er nede.",
+      "Den eksakte manglende objektverdien og en kodefiks er ikke bekreftet gjennom kode eller en test.",
+      "Nåværende 5xx-rate og effekten av en eventuell rollback må måles; de kan ikke utledes av den gamle 9,4 %-målingen."
+    ],
+    "actions": [
+      {"recommendation": "Anbefal at betalingsvakten vurderer rollback fra 2.14.0 til forrige dokumenterte versjon 2.13.2 etter å ha kontrollert gjeldende versjon og rollback-forutsetninger. Runbookens kommando er deploy rollback betaling; rapporten utfører den ikke.", "owner": "Team Myntkammer / Sigrid Gravlund", "verification": "Kontroller kjørende versjon, bortfall av TypeError og 5xx under alarmterskelen 5 % i et nytt målevindu, samt vellykkede utenlandske korttrekk.", "evidence": ["RUNBOOK-betaling", "DEPLOY-002", "DEPLOY-009", "ALARM-0312"]},
+      {"recommendation": "Undersøk beregnGebyr og kontrakten for kortinfo/valuta. Lag regresjonstest for manglende kortinfo og utenlandske kort før ny utrulling.", "owner": "Team Myntkammer", "verification": "Reproduser det observerte feilmønsteret og vis at rettingen håndterer manglende felt uten 500.", "evidence": ["LOG-0048", "DEPLOY-009"]}
+    ],
+    "owners": [{"team": "Team Myntkammer", "primary": "Sigrid Gravlund", "secondary": "Ola Benkvist", "evidence": ["TJENESTE-betaling"]}],
+    "escalation": "Anbefal å vekke betalingsvakten Sigrid Gravlund; Ola Benkvist er sekundær. Runbooken ber vakten informere #betaling-drift ved rollback. Ingen varsling er sendt av agenten.",
+    "pitfalls": [
+      {"claim": "Kortnett er årsaken til 5xx-alarmen.", "assessment": "Ikke støttet: de tidlige feilene er lokale TypeError. Kortnett svarte på 238 ms og 282 ms før alarmen. Det finnes én senere treg måling på 1 840 ms, men den forklarer ikke feilen som begynte kl 02:52.", "evidence": ["LOG-0048", "LOG-0087", "LOG-0092", "LOG-0151"]},
+      {"claim": "Grønn helsesjekk betyr at betalingsfunksjonen virker.", "assessment": "Avkreftet som tilstrekkelig kontroll: /helse var OK kl 02:51:50, mens korttrekk feilet 40 sekunder senere.", "evidence": ["LOG-0045", "LOG-0048"]},
+      {"claim": "Databasevedlikeholdet utløste den opprinnelige betalingsalarmen.", "assessment": "Tidsrekkefølgen avkrefter dette: TypeError starter kl 02:52:30, vedlikeholdet først kl 03:30. Senere databasebelastning er et eget spor.", "evidence": ["LOG-0048", "LOG-0170"]}
+    ],
+    "atAlarmTime": {
+      "summary": "Ved 03:12 er deploy, TypeError og 9,4 % 5xx kjent, så rollback-vurderingen er allerede godt støttet. Feil etter 03:12 og databasevedlikeholdet må ikke brukes som datidens observasjoner.",
+      "requiredEvidence": ["ALARM-0312", "DEPLOY-009", "DEPLOY-002", "LOG-0044", "LOG-0048", "LOG-0049", "LOG-0103", "LOG-0087", "LOG-0092"],
+      "excludedLaterEvidence": ["LOG-0151", "LOG-0170", "LOG-0254", "LOG-0255"]
+    }
+  },
+  {
+    "alarmId": "ALARM-0305",
+    "title": "Innlogging: diskalarmen avklart etter loggrotasjon",
+    "curated": true,
+    "asOf": "2026-10-29T03:48:05+01:00",
+    "alarmTime": "2026-10-29T03:05:00+01:00",
+    "severity": "advarsel",
+    "status": "avklart",
+    "affectedServices": ["innlogging"],
+    "requiredEvidence": ["ALARM-0305", "LOG-0068", "LOG-0082", "LOG-0095", "RUNBOOK-innlogging", "INC-2026-026", "TJENESTE-innlogging"],
+    "facts": [
+      {"text": "Loggrotasjon på innlogging-02 startet kl 03:00:01. /var var 91 % full kl 03:04:50, før diskalarmen kl 03:05.", "evidence": ["LOG-0068", "LOG-0082", "ALARM-0305"]},
+      {"text": "Rotasjonen ble fullført kl 03:09:12, frigjorde 11,8 GB og etterlot /var på 54 %. Dette er den siste eksplisitte diskmålingen i materialet.", "evidence": ["LOG-0095"]},
+      {"text": "Runbooken beskriver midlertidig diskbruk under komprimering. Samme mønster på samme instans er registrert i INC-2026-026.", "evidence": ["RUNBOOK-innlogging", "INC-2026-026"]}
+    ],
+    "hypothesis": {
+      "text": "Diskalarmen skyldtes den dokumenterte, midlertidige diskbruken under loggrotasjon. Denne alarmen er avklart av fullføringsloggen og den målte reduksjonen til 54 %.",
+      "confidence": "høy",
+      "evidence": ["LOG-0068", "LOG-0082", "LOG-0095", "RUNBOOK-innlogging"]
+    },
+    "uncertainty": [
+      "54 % er målt kl 03:09:12; ingen nyere diskprosent finnes.",
+      "Avklaring av diskalarmen friskmelder ikke innlogging som helhet. Senere SMS- og databasefeil er separate hendelser."
+    ],
+    "actions": [
+      {"recommendation": "Registrer diskalarmen som avklart på grunnlag av fullført rotasjon og 54 % diskbruk. Innhent en fersk diskmåling dersom dagens tilstand skal bekreftes; opprydding er ikke begrunnet av denne alarmen.", "owner": "Team Nøkkelknippe", "verification": "Kontroller at /var fortsatt ligger under runbookens 70 %-grense og at ingen ny diskalarm er kommet.", "evidence": ["LOG-0095", "RUNBOOK-innlogging"]},
+      {"recommendation": "Følg opp den tidligere foreslåtte justeringen av varsling rundt loggrotasjonen, med varsel dersom høy diskbruk varer ved.", "owner": "Team Nøkkelknippe", "verification": "En kort forventet topp kan dempes, mens disk over 90 % etter 03:20 fortsatt må fanges opp.", "evidence": ["INC-2026-004", "INC-2026-026", "RUNBOOK-innlogging"]}
+    ],
+    "owners": [{"team": "Team Nøkkelknippe", "primary": "Hedda Uglevik", "secondary": "Petter Mørkeskog", "evidence": ["TJENESTE-innlogging"]}],
+    "escalation": "Ingen oppvekking anbefales for den avklarte diskalarmen alene. Ved vedvarende eller ny høy diskbruk er Hedda Uglevik primærvakt, Petter Mørkeskog sekundær.",
+    "pitfalls": [
+      {"claim": "Slett arkiver eller restart innlogging umiddelbart.", "assessment": "Ikke begrunnet: rotasjonen fullførte og disken falt under 70 %. Runbookens slettetrinn gjelder ved disk over 90 % etter 03:20.", "evidence": ["LOG-0095", "RUNBOOK-innlogging"]},
+      {"claim": "Diskalarmen var allerede bekreftet løst kl 03:05.", "assessment": "Feil bruk av fremtidig informasjon: fullføringsloggen kommer først kl 03:09:12.", "evidence": ["ALARM-0305", "LOG-0095"]},
+      {"claim": "All innlogging er friskmeldt fordi diskalarmen er avklart.", "assessment": "Avkreftet: senere logger viser manglende bekreftelse på SMS og mangel på databasetilkoblinger.", "evidence": ["LOG-0164", "LOG-0204"]}
+    ],
+    "atAlarmTime": {
+      "summary": "Ved 03:05 er loggrotasjon en godt støttet forklaring, men fullføring er ennå ikke observert. Anbefal å følge rotasjonen og kontrollere disk under 70 %. Hvis disk fortsatt er over 90 % etter 03:20, vurder runbookens videre trinn med ansvarlig vakt.",
+      "requiredEvidence": ["ALARM-0305", "LOG-0068", "LOG-0082", "RUNBOOK-innlogging", "INC-2026-026"],
+      "excludedLaterEvidence": ["LOG-0095", "LOG-0164", "LOG-0204"]
+    }
+  },
+  {
+    "alarmId": "ALARM-0320",
+    "title": "Søk: fullindeks presser heap og responstid",
+    "curated": true,
+    "asOf": "2026-10-29T03:48:05+01:00",
+    "alarmTime": "2026-10-29T03:20:00+01:00",
+    "severity": "høy",
+    "status": "uavklart",
+    "affectedServices": ["sok", "api-gateway"],
+    "requiredEvidence": ["ALARM-0320", "LOG-0067", "LOG-0122", "LOG-0123", "LOG-0140", "LOG-0141", "LOG-0130", "RUNBOOK-sok", "INC-2026-031", "TJENESTE-sok"],
+    "facts": [
+      {"text": "Nattlig reindeks startet kl 03:00 som fullindeks av produkter-v7 med 2,1 millioner dokumenter, mens runbooken sier at den skal være inkrementell.", "evidence": ["LOG-0067", "RUNBOOK-sok"]},
+      {"text": "Før alarmen er heap på sok-node-2 observert på 92 %, GC-pause 2,8 s og p95 4,1 s. Selve alarmen kl 03:20 oppgir p95 4,6 s og enkelte 504.", "evidence": ["LOG-0122", "LOG-0123", "ALARM-0320"]},
+      {"text": "Etter alarmen observeres 504 fra upstream=sok kl 03:22:01 og 03:23:47. Kl 03:24:12 er heap 94 % og GC-pause 3,5 s; kl 03:24:16 er p95 5,1 s.", "evidence": ["LOG-0130", "LOG-0139", "LOG-0140", "LOG-0141"]},
+      {"text": "Senere finnes raske enkeltsøk, blant annet 31 ms kl 03:39:42 og gateway-søk på 174 ms kl 03:46:49. Ingen nyere samlet p95, fullført reindeks eller utført pause er dokumentert.", "evidence": ["LOG-0227", "LOG-0253", "LOG-0141"]}
+    ],
+    "hypothesis": {
+      "text": "Sterkt støttet hypotese: fullindeks på noder som også tar trafikk gir minnepress og lange GC-pauser på sok-node-2. Mønsteret samsvarer med INC-2026-031; aktuell normalisering er uavklart.",
+      "confidence": "høy",
+      "evidence": ["LOG-0067", "LOG-0140", "LOG-0141", "INC-2026-031", "RUNBOOK-sok"]
+    },
+    "uncertainty": [
+      "Ny p95, heap og jobbstatus mangler. Raske enkeltkall er utilstrekkelige til å erklære hendelsen løst, men 5,1 s må heller ikke presenteres som en fersk måling kl 03:48.",
+      "Årsaken til at jobben gikk i fullmodus er ikke dokumentert. Synonymliste-endringen er ikke bevist årsak.",
+      "Alarmen kl 03:20 oppgir 4,6 s og 504, mens de tilsvarende detaljloggene kommer senere. Ved analyse på alarmtid må opplysningene tilskrives alarmen."
+    ],
+    "actions": [
+      {"recommendation": "Hent fersk p95, heap, GC og reindeksstatus. Hvis fullindeksen fortsatt kjører og gir høy latenstid, anbefal runbookens sokctl reindeks pause produkter-v7 til ansvarlig operatør.", "owner": "Team Spåkula / Mina Spøkelsesen", "verification": "Etter en eventuell pause: kontroller p95 under 1 s innen 2–3 minutter og fall i heap, GC-pauser og 504.", "evidence": ["RUNBOOK-sok", "LOG-0067", "LOG-0140", "LOG-0141"]},
+      {"recommendation": "Hvis reindeksen pauses, anbefal at den ikke startes på nytt samme natt. Teamet bør verifisere inkrementell modus før neste planlagte kjøring.", "owner": "Team Spåkula", "verification": "Bekreft riktig jobbkonfigurasjon og kontroller neste kjøring med p95 og heap-målinger.", "evidence": ["RUNBOOK-sok", "INC-2026-031"]}
+    ],
+    "owners": [{"team": "Team Spåkula", "primary": "Mina Spøkelsesen", "secondary": "Arne Lyktemann", "evidence": ["TJENESTE-sok"]}],
+    "escalation": "Runbooken krever ingen oppvekking hvis pausen virker. Hvis p95 ikke normaliseres, eller pause ikke kan gjennomføres, anbefal eskalering til Mina Spøkelsesen, med Arne Lyktemann som sekundær.",
+    "pitfalls": [
+      {"claim": "Synonymadvarselen beviser at deploy 3.9.1 utløste tregheten.", "assessment": "Ikke dokumentert. Fullindeks, heap og GC gir et langt mer direkte støttet spor; én ignorert synonymoppføring etablerer ikke årsak.", "evidence": ["DEPLOY-006", "LOG-0060", "LOG-0067", "LOG-0140"]},
+      {"claim": "Søk er bekreftet friskmeldt etter kl 03:24.", "assessment": "Uavklart: senere raske enkeltkall finnes, men ingen ny p95 eller dokumentert avslutning/pause av reindeksen.", "evidence": ["LOG-0141", "LOG-0227", "LOG-0253"]},
+      {"claim": "Alle gatewayens 504 har denne søkeårsaken.", "assessment": "Avkreftet: den senere gatewayalarmen oppgir mest upstream=innlogging og har et eget databaselåsspor.", "evidence": ["LOG-0130", "LOG-0171", "LOG-0228"]}
+    ],
+    "atAlarmTime": {
+      "summary": "Ved 03:20 er fullindeks, heap 92 %, GC 2,8 s og p95 4,1 s dokumentert i logger. Alarmen selv oppgir 4,6 s og 504. Dette støtter pause-vurdering allerede da, men logger kl 03:21–03:24 er fremtidige og skal utelates.",
+      "requiredEvidence": ["ALARM-0320", "LOG-0067", "LOG-0122", "LOG-0123", "RUNBOOK-sok", "INC-2026-031"],
+      "excludedLaterEvidence": ["LOG-0129", "LOG-0130", "LOG-0139", "LOG-0140", "LOG-0141", "LOG-0227", "LOG-0253"]
+    }
+  },
+  {
+    "alarmId": "ALARM-0331",
+    "title": "SMS: leveringssvikt, rate limiting og mulig retry-forsterkning",
+    "curated": true,
+    "asOf": "2026-10-29T03:48:05+01:00",
+    "alarmTime": "2026-10-29T03:31:00+01:00",
+    "severity": "høy",
+    "status": "pågår",
+    "affectedServices": ["varsling", "innlogging"],
+    "requiredEvidence": ["ALARM-0331", "LOG-0131", "LOG-0137", "LOG-0155", "LOG-0164", "LOG-0174", "LOG-0196", "LOG-0202", "LOG-0242", "DEPLOY-005", "RUNBOOK-varsling", "TJENESTE-varsling", "TJENESTE-innlogging"],
+    "facts": [
+      {"text": "Første observerte SmsBud-timeout er kl 03:22:15. HTTP 429 med Retry-After 30 s er observert fra kl 03:23:40; både engangskoder og leveringsvarsler rammes.", "evidence": ["LOG-0131", "LOG-0137", "LOG-0143", "LOG-0167"]},
+      {"text": "SMS-køen var 1 240 kl 03:27 og 2 310 kl 03:35. Siste leveringsratemåling er 58 % siste ti minutter kl 03:31. Siste observerte 429 er kl 03:42:30; nyere kø og rate mangler.", "evidence": ["LOG-0155", "LOG-0202", "LOG-0174", "LOG-0242"]},
+      {"text": "Innlogging rapporterte engangskode-SMS uten leveringsbekreftelse innen 60 s kl 03:28:05 og 03:37:40. Enkelte SMS-sendinger lykkes; dette er ikke dokumentasjon på at leveransene er normalisert.", "evidence": ["LOG-0164", "LOG-0218", "LOG-0198"]},
+      {"text": "Varsling 1.22.0 oppgraderte SmsBud-klienten og endret retry fra tre forsøk med eksponentiell pause til fem med kort pause 26. oktober.", "evidence": ["DEPLOY-005"]},
+      {"text": "Den loggede statussiden kl 03:34:20 sa ingen kjente avvik, men var sist oppdatert kl 02:10. E-post hadde 412 sendinger og null feil siste ti minutter kl 03:38, og push har vellykkede eksempler.", "evidence": ["LOG-0196", "LOG-0219", "LOG-0163"]}
+    ],
+    "hypothesis": {
+      "text": "Rotårsaken er ikke avklart. Timeout kan skyldes SmsBud eller forbindelsen dit; 429 viser rate limiting. Den mer aggressive retry-policyen kan forsterke trafikken, men loggene beviser verken at retry ignorerer Retry-After, at klientendringen utløste feilen, eller at leverandøren har driftsavbrudd.",
+      "confidence": "middels",
+      "evidence": ["LOG-0131", "LOG-0137", "DEPLOY-005", "LOG-0196", "RUNBOOK-varsling"]
+    },
+    "uncertainty": [
+      "Det mangler en fersk leverandørstatus, klientens faktiske request-/retry-rate, kvoteinformasjon og transportmålinger som skiller forklaringene.",
+      "Statusside-observasjonen er gammel og beviser ikke at SmsBud er frisk. Historisk SmsBud-avbrudd beviser heller ikke et nytt avbrudd.",
+      "Ingen nyere målinger bekrefter dagens køstørrelse, leveringsrate eller bedring. Databasesvikten fra kl 03:30 er et separat problem som også påvirker innlogging."
+    ],
+    "actions": [
+      {"recommendation": "Anbefal at Team Ugla prioriterer engangskoder og vurderer varslingctl pause mal=leveringsvarsel, siden siste målte kø er over runbookens 1 000-grense. Bekreft fersk kø og konsekvenser før tiltak.", "owner": "Team Ugla / Jonas Kistesen", "verification": "Følg køutvikling, 429, timeout og faktisk leveringstid for engangskoder; bekreft bedret leveringsrate i et nytt ti-minuttersvindu.", "evidence": ["RUNBOOK-varsling", "LOG-0155", "LOG-0202", "LOG-0164"]},
+      {"recommendation": "Undersøk klientversjon, total request-rate, retry-rate og om Retry-After 30 s respekteres. Vurder kontrollert tilbakeføring av retry-policyen hvis målingene støtter egen forsterkning.", "owner": "Team Ugla", "verification": "Sammenlign originaltrafikk og retry-trafikk med kvoten, og bekreft at eventuell endring senker 429 og kø uten å miste meldinger.", "evidence": ["DEPLOY-005", "LOG-0137", "RUNBOOK-varsling"]},
+      {"recommendation": "Hent oppdatert SmsBud-status og leverandørens vurdering. Følg runbookens eskalering ved over 30 minutters vedvarende feil; fra første observerte timeout er dette etter omtrent 03:52:15, hvis feilen fortsatt pågår.", "owner": "Team Ugla / Jonas Kistesen", "verification": "Dokumenter tidspunkt og konkret svar fra leverandøren samt utviklingen i egne leveringsmålinger.", "evidence": ["LOG-0131", "LOG-0196", "RUNBOOK-varsling"]}
+    ],
+    "owners": [
+      {"team": "Team Ugla", "primary": "Jonas Kistesen", "secondary": "Live Huldersen", "evidence": ["TJENESTE-varsling"]},
+      {"team": "Team Nøkkelknippe", "primary": "Hedda Uglevik", "secondary": "Petter Mørkeskog", "evidence": ["TJENESTE-innlogging"]}
+    ],
+    "escalation": "Anbefal å vekke Jonas Kistesen (sekundær Live Huldersen) og informere Team Nøkkelknippe om engangskodene. Runbooken anbefaler SmsBud-døgnvakt ved over 30 minutters feil. Ved siste observasjonstid 03:48:05 har det gått 25 min 50 s fra første loggede timeout, så denne terskelen er ikke dokumentert passert. Ingen kontakt er utført.",
+    "pitfalls": [
+      {"claim": "Det er sikkert bare SmsBud som er nede.", "assessment": "Ikke bevist: timeout og 429 forekommer sammen, og lokal retry-policy er en mulig medvirkende faktor. Noen sendinger lykkes.", "evidence": ["LOG-0131", "LOG-0137", "DEPLOY-005", "LOG-0198"]},
+      {"claim": "Grønn statusside friskmelder SmsBud.", "assessment": "Ikke holdbart: siden var sist oppdatert kl 02:10, før de første observerte feilene.", "evidence": ["LOG-0196", "LOG-0131", "RUNBOOK-varsling"]},
+      {"claim": "429 beviser at vi sender i en feilaktig løkke eller ignorerer Retry-After.", "assessment": "Ikke bevist. Det viser at forespørsler blir rate limited; request-rate, kvote og retry-oppførsel må undersøkes.", "evidence": ["LOG-0137", "DEPLOY-005"]},
+      {"claim": "Runbookens 30-minuttersgrense var allerede passert ved alarmen.", "assessment": "Avkreftet av tilgjengelig tidslinje: kl 03:31 er det 8 min 45 s siden første observerte timeout, og ved 03:48:05 er det 25 min 50 s.", "evidence": ["LOG-0131", "ALARM-0331"]}
+    ],
+    "atAlarmTime": {
+      "summary": "Ved 03:31 er timeout, 429, kø 1 240, engangskodeproblemer, klientendringen og 58 % levering kjent. Både leverandørproblem og egen retry-forsterkning må holdes åpne. Den senere statussideloggen, kø 2 310 og e-postmålingen kl 03:38 er ennå ukjente.",
+      "requiredEvidence": ["ALARM-0331", "LOG-0131", "LOG-0137", "LOG-0155", "LOG-0164", "LOG-0174", "DEPLOY-005", "RUNBOOK-varsling"],
+      "excludedLaterEvidence": ["LOG-0196", "LOG-0198", "LOG-0202", "LOG-0218", "LOG-0219", "LOG-0242"]
+    }
+  },
+  {
+    "alarmId": "ALARM-0340",
+    "title": "Gateway: databasevedlikehold blokkerer sesjoner og fyller tilkoblinger",
+    "curated": true,
+    "asOf": "2026-10-29T03:48:05+01:00",
+    "alarmTime": "2026-10-29T03:40:00+01:00",
+    "severity": "kritisk",
+    "status": "pågår",
+    "affectedServices": ["kunde-db", "innlogging", "api-gateway"],
+    "requiredEvidence": ["ALARM-0340", "LOG-0170", "LOG-0171", "LOG-0175", "LOG-0197", "LOG-0199", "LOG-0204", "LOG-0193", "LOG-0228", "LOG-0244", "DEPLOY-003", "DEPLOY-008", "RUNBOOK-kunde-db", "TJENESTE-kunde-db", "TJENESTE-innlogging", "TJENESTE-api-gateway", "INC-2026-014"],
+    "facts": [
+      {"text": "Cron-konfig r41 flyttet ukentlig databasevedlikehold fra søndag 04:00 til torsdag 03:30. Denne natten startet VACUUM FULL sesjoner og REINDEX sesjoner kl 03:30.", "evidence": ["DEPLOY-003", "LOG-0170"]},
+      {"text": "VACUUM FULL tok AccessExclusiveLock på sesjoner, 41 GB, kl 03:30:01. Deretter viser databasen ventende innlogging-prosesser og innlogging viser stadig tregere SELECT mot sesjoner.", "evidence": ["LOG-0171", "LOG-0175", "LOG-0177", "LOG-0226"]},
+      {"text": "Aktive databasetilkoblinger økte fra 88 av 200 kl 03:31:30 til 198 av 200 kl 03:34:30. Fra 03:34:40 rapporteres reserverte tilkoblingsplasser, og innlogging får too many connections.", "evidence": ["LOG-0178", "LOG-0197", "LOG-0199", "LOG-0204"]},
+      {"text": "Gatewayen gir 504 etter 30 s på /api/konto/meg og /api/innlogging med upstream=innlogging. Alarmmålingen kl 03:40 er 17,2 % 504 siste fem minutter, mest mot innlogging.", "evidence": ["LOG-0193", "LOG-0207", "LOG-0228", "ALARM-0340"]},
+      {"text": "Vedlikeholdet er siste gang målt til 38 % kl 03:44, og 504 observeres kl 03:44:30. Ingen fullføring eller ny samlet 504-rate finnes; enkelte vellykkede konto-kall forekommer også.", "evidence": ["LOG-0244", "LOG-0245", "LOG-0252"]},
+      {"text": "Database-runbooken er fra 2025-11-04 og hevder pgbouncer og søndagskjøring. Tjenesteoversikten sier direkte databasetilkoblinger etter fjerning av pgbouncer 12. mars 2026; hendelseshistorikken og r41 dokumenterer begge avvikene.", "evidence": ["RUNBOOK-kunde-db", "TJENESTE-kunde-db", "INC-2026-014", "DEPLOY-003"]}
+    ],
+    "hypothesis": {
+      "text": "Sterkt støttet årsakskjede: flyttet vedlikehold tar eksklusiv lås på sesjoner, innlogging venter og opptar tilkoblinger, tilkoblingskapasiteten blir utilgjengelig for vanlige klienter, og gatewayen returnerer 504. Låsens aktuelle eier/prosess må kontrolleres før inngrep.",
+      "confidence": "høy",
+      "evidence": ["DEPLOY-003", "LOG-0171", "LOG-0175", "LOG-0197", "LOG-0199", "LOG-0204", "LOG-0228", "INC-2026-041"]
+    },
+    "uncertainty": [
+      "Loggene identifiserer ventende prosesser, men ingen sikkert identifisert PID for den blokkerende vedlikeholdsprosessen. Ikke bruk en ventende PID som blocker-PID.",
+      "38 % er fremdrift kl 03:44, ikke en trygg prognose for ferdigstillelse. Ny fremdrift, låsstatus og tilkoblingsmåling mangler.",
+      "Betaling deler databasen og bør overvåkes for følgefeil, men betalingsfeilene som er dokumentert her er allerede pågående TypeError fra en separat utrulling.",
+      "SMS-problemene kan samtidig hindre engangskoder. Å rette databaselåsen alene garanterer ikke at alle innloggingsproblemer er borte."
+    ],
+    "actions": [
+      {"recommendation": "Anbefal umiddelbar eskalering til databasevakten. Be vakten kontrollere aktive spørringer, blokkeringskjede, den faktiske vedlikeholdsprosessen og tilkoblingsbelegg før tiltak.", "owner": "Team Grunnmur / Even Gravdal", "verification": "Dokumenter hvem som holder låsen på sesjoner, hvem som venter, og om VACUUM FULL fortsatt kjører.", "evidence": ["LOG-0171", "LOG-0175", "LOG-0199", "TJENESTE-kunde-db"]},
+      {"recommendation": "Be databasevakten vurdere kontrollert avbrytelse av det blokkerende vedlikeholdet opp mot kostnad og risiko ved å vente. Dette er en operatørbeslutning; ingen databasekommando, restart eller failover utføres av rapporten.", "owner": "Team Grunnmur / Even Gravdal", "verification": "Følg frigitt lås, fallende ventekø og tilkoblingsbelegg, normal sesjonslesing og ny 504-rate under 5 %. Kontroller konto og innlogging separat fra SMS-levering.", "evidence": ["LOG-0171", "LOG-0244", "LOG-0228", "ALARM-0340", "LOG-0164"]},
+      {"recommendation": "Avtal et vedlikeholdsopplegg som ikke blokkerer innlogging, og oppdater kunde-db-runbooken med direkte tilkoblinger, gjeldende plan og et validert låshåndteringsløp.", "owner": "Team Grunnmur sammen med Team Nøkkelknippe", "verification": "Gjennomgå faktisk cron-konfigurasjon og bekreft at ny dokumentasjon samsvarer med dagens arkitektur.", "evidence": ["DEPLOY-003", "RUNBOOK-kunde-db", "TJENESTE-kunde-db", "INC-2026-014"]}
+    ],
+    "owners": [
+      {"team": "Team Grunnmur", "primary": "Even Gravdal", "secondary": "Rune Skjelbred", "evidence": ["TJENESTE-kunde-db"]},
+      {"team": "Team Nøkkelknippe", "primary": "Hedda Uglevik", "secondary": "Petter Mørkeskog", "evidence": ["TJENESTE-innlogging"]},
+      {"team": "Team Portvokter", "primary": "Trond Benrangel", "secondary": "Ida Nattmo", "evidence": ["TJENESTE-api-gateway"]}
+    ],
+    "escalation": "Anbefal å vekke Even Gravdal umiddelbart, med Rune Skjelbred som sekundær. Involver Hedda Uglevik og Trond Benrangel for brukerflyt og gateway-målinger. Ingen vakt er kontaktet av agenten.",
+    "pitfalls": [
+      {"claim": "Restart pgbouncer og gjør deretter failover slik runbooken sier.", "assessment": "Runbooken er utdatert. pgbouncer ble fjernet 12. mars, og loggene peker på tabellås, ikke en pgbouncer-feil. Failover er ikke begrunnet eller validert av dette materialet.", "evidence": ["RUNBOOK-kunde-db", "TJENESTE-kunde-db", "INC-2026-014", "LOG-0171"]},
+      {"claim": "Gatewayens timeout-konfigurasjon kl 03:36 utløste feilen.", "assessment": "Ikke støttet: 504 mot innlogging startet kl 03:33:50 før reload. Konfigendringen gjelder bare /api/rapport; andre ruter beholdt 30 s.", "evidence": ["LOG-0193", "LOG-0210", "DEPLOY-008", "TJENESTE-api-gateway"]},
+      {"claim": "Øk alle gateway-timeouts eller maks tilkoblinger for å løse årsaken.", "assessment": "Ingen dokumentert støtte for dette som årsaksløsning. Den eksklusive tabellåsen består og må vurderes av databasevakten.", "evidence": ["LOG-0171", "LOG-0199", "LOG-0228"]},
+      {"claim": "Søk, diskrotasjon eller rate limiting av den interne klienten forklarer alle 504.", "assessment": "Den aktuelle alarmen er hovedsakelig mot innlogging. Diskrotasjonen fullførte kl 03:09, tidlige søke-504 har upstream=sok, og klient 10.4.7.22 er kjent bakgrunnsstøy.", "evidence": ["LOG-0228", "LOG-0095", "LOG-0130", "LOG-0118", "INC-2026-044"]}
+    ],
+    "atAlarmTime": {
+      "summary": "Ved 03:40 er vedlikehold, lås, tilkoblingsmangel og 504-kjeden allerede dokumentert. Utdatert runbook kan avdekkes med tjenesteoversikt, historikk og deploy r41. Fremdrift på 38 % kl 03:44 og senere enkeltkall er ennå ukjente.",
+      "requiredEvidence": ["ALARM-0340", "LOG-0170", "LOG-0171", "LOG-0175", "LOG-0197", "LOG-0199", "LOG-0204", "LOG-0193", "LOG-0228", "DEPLOY-003", "DEPLOY-008", "RUNBOOK-kunde-db", "TJENESTE-kunde-db", "INC-2026-014"],
+      "excludedLaterEvidence": ["LOG-0244", "LOG-0245", "LOG-0252"]
+    }
+  }
+]
